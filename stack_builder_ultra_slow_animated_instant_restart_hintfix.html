@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stack Builder — Ultra Slow Pastel (Smooth Animations, Instant Restart)</title>
+<style>
+  :root{ --bg:#fff; --fg:#000; --danger:#ff4c4c; }
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    display:grid; place-items:center; overflow:hidden;
+  }
+  #wrap{ position:relative; }
+  canvas{ background:#fff; display:block; border:2px solid var(--fg); border-radius:16px; }
+  .hud{ position:absolute; top:10px; left:12px; font-size:14px; z-index:3 }
+  .hint{ position:absolute; bottom:6px; left:6px; font-size:12px; opacity:.8; z-index:3 }
+  .overlay{
+    position:absolute; inset:0; display:grid; place-items:center; text-align:center; z-index:4;
+    font-size:26px; color:#000; pointer-events:none; opacity:0; transform:scale(.96);
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .overlay.show{ opacity:1; transform:scale(1); }
+  .redcover{ position:absolute; inset:0; background:var(--danger); z-index:2; opacity:0; pointer-events:none; transition:opacity .35s ease; }
+  .scan{ position:absolute; inset:0; pointer-events:none; z-index:2;
+         background:repeating-linear-gradient(to bottom, rgba(0,0,0,.06) 0 2px, transparent 2px 4px); mix-blend-mode:multiply; }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <div class="hud">Score: <span id="score">0</span></div>
+    <div class="hint">Space/Click to drop • R to restart</div>
+    <div id="overlay" class="overlay"></div>
+    <div id="red" class="redcover"></div>
+    <div class="scan"></div>
+    <canvas id="c" width="360" height="640"></canvas>
+  </div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const scoreEl = document.getElementById('score');
+const overlay = document.getElementById('overlay');
+const red = document.getElementById('red');
+
+// Audio
+let actx=null;
+function ensureAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+function tone(freq, dur=0.1, type="sine", gain=0.05){
+  if(!actx) return;
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type; o.frequency.value=freq; g.gain.value=gain;
+  const now=actx.currentTime;
+  g.gain.setValueAtTime(gain, now);
+  g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+  o.connect(g).connect(actx.destination);
+  o.start(now); o.stop(now+dur+0.02);
+}
+const sfx={
+  drop(){ tone(420,.08,"triangle",.05); },
+  cut(){ tone(260,.1,"square",.05); setTimeout(()=>tone(200,.08,"square",.045),70); },
+  perfect(){ tone(900,.12,"sine",.06); setTimeout(()=>tone(1200,.12,"sine",.05),90); },
+  fail(){ tone(140,.3,"sawtooth",.07); }
+};
+
+let stack=[];
+let mover=null;
+let speed=0.05; // ultra slow start
+let direction=1;
+let running=false, gameOver=false;
+let score=0;
+let baseY = H-40;
+let shake=0;
+let pulse=0; // game-over pulse
+let firstPlay=true;
+
+const BLOCK_H = 20;
+const START_W = 140;
+const PERFECT_TOL = 4;
+
+// Pastel colors
+const colors = ["#ffd6d6","#ffe6b3","#d6ffd6","#d6e6ff","#f2d6ff","#fff0b3"];
+
+window.addEventListener('keydown',e=>{
+  if(e.code==="Space"){ e.preventDefault(); handleDrop(); }
+  if(e.key==="r"||e.key==="R"){ if(gameOver) start(); else reset(); }
+  ensureAudio();
+});
+canvas.addEventListener('pointerdown',()=>{ ensureAudio(); handleDrop(); });
+
+function start(){
+  running=true; gameOver=false; red.style.opacity=0;
+  overlay.classList.remove('show');
+  stack=[];
+  score=0; speed=0.05; direction=1; shake=0; pulse=0;
+  stack.push({x:(W-START_W)/2, y:baseY, w:START_W, h:BLOCK_H, settled:true, color:"#000", bounceStart:0, glow:0});
+  spawnMover();
+  draw();
+  requestAnimationFrame(loop);
+  firstPlay=false;
+}
+
+function reset(){
+  running=false; gameOver=false;
+  if(firstPlay){
+    overlay.innerHTML = 'Click or press <b>Space</b> to start';
+    overlay.classList.add('show');
+  }else{
+    start(); // after first play, skip overlay
+  }
+  draw();
+}
+
+function spawnMover(){
+  const last = stack[stack.length-1];
+  const w = last.w;
+  const color = colors[Math.floor(Math.random()*colors.length)];
+  mover = { x: direction>0 ? -w : W, y: last.y - BLOCK_H, w, h: BLOCK_H, settled:false, color, vx:0 };
+  direction *= -1;
+}
+
+function handleDrop(){
+  if(!running){ start(); return; }
+  if(gameOver){ start(); return; }
+  if(!mover) return;
+  mover.settled=true;
+  const last = stack[stack.length-1];
+  const overlapLeft = Math.max(mover.x, last.x);
+  const overlapRight = Math.min(mover.x + mover.w, last.x + last.w);
+  const overlap = overlapRight - overlapLeft;
+
+  if(overlap <= 0){
+    sfx.fail();
+    gameOver = true;
+    red.style.opacity=0.9; // softer than hard cut
+    overlay.innerHTML = `GAME OVER<br>Score: ${score}<br><small>Press R / Space / Click to restart</small>`;
+    overlay.classList.add('show');
+    pulse = 1; // trigger soft pulse
+    return;
+  }
+
+  const newW = overlap;
+
+  let perfect=false;
+  if(Math.abs(mover.x - last.x) <= PERFECT_TOL){
+    mover.x = last.x;
+    sfx.perfect();
+    perfect=true;
+  }else{
+    sfx.cut();
+    shake = 160;
+  }
+
+  mover.x = overlapLeft;
+  mover.w = newW;
+  mover.bounceStart = performance.now(); // start bounce
+  mover.glow = perfect ? 1 : 0; // perfect glow
+  stack.push(mover);
+  mover = null;
+
+  score++;
+  scoreEl.textContent = score;
+
+  const topY = stack[stack.length-1].y;
+  if(topY < H * 0.28){
+    const dy = (H * 0.28) - topY;
+    stack.forEach(b => b.y += dy);
+  }
+
+  speed = Math.min(0.5, speed + 0.005); // ultra slow ramp-up
+  if(stack[stack.length-1].w < 8){
+    sfx.fail();
+    gameOver=true;
+    red.style.opacity=0.9;
+    overlay.innerHTML = `GAME OVER<br>Score: ${score}<br><small>Press R / Space / Click to restart</small>`;
+    overlay.classList.add('show');
+    pulse = 1;
+    return;
+  }
+  spawnMover();
+}
+
+function update(dt){
+  if(mover && !mover.settled){
+    mover.x += direction * speed * dt * 0.1 * 60;
+    if(direction>0 && mover.x + mover.w >= W) { direction=-1; mover.x = W - mover.w; }
+    if(direction<0 && mover.x <= 0) { direction=1; mover.x = 0; }
+  }
+  if(shake>0) shake -= dt;
+  if(pulse>0) pulse *= 0.9; // decay pulse
+  for(const b of stack){ if(b.glow>0) b.glow *= 0.9; }
+}
+
+function draw(){
+  const now = performance.now();
+  let sx=0, sy=0;
+  if(shake>0){ sx = (Math.random()*2-1)*2; sy = (Math.random()*2-1)*2; }
+  const amp = Math.min(2.5, stack.length * 0.08);
+  const sway = Math.sin(now * 0.0012) * amp;
+  const scale = 1 + 0.02 * pulse;
+
+  ctx.setTransform(scale,0,0,scale,0,0);
+  ctx.clearRect(0,0,W,H);
+  ctx.translate(sx + sway, sy);
+
+  ctx.strokeStyle = "#000"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, baseY+BLOCK_H+0.5); ctx.lineTo(W, baseY+BLOCK_H+0.5); ctx.stroke();
+
+  for(const b of stack){
+    let scaleY = 1, offY = 0;
+    if(b.bounceStart){
+      const t = Math.min(1, (now - b.bounceStart)/380);
+      const damp = Math.exp(-6*t)*Math.cos(10*t);
+      const squash = Math.max(0, damp) * 0.12;
+      scaleY = 1 - squash;
+      offY = (1-scaleY)*b.h;
+      if(t>=1) b.bounceStart = 0;
+    }
+    ctx.save();
+    ctx.translate(Math.round(b.x)+0.5, Math.round(b.y)+0.5 + offY);
+    ctx.scale(1, scaleY);
+    ctx.fillStyle=b.color;
+    ctx.fillRect(0, 0, Math.round(b.w), b.h);
+    if(b.glow>0){
+      ctx.globalAlpha = Math.min(0.6, b.glow*0.6);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, Math.round(b.w), b.h);
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  if(mover){
+    ctx.fillStyle=mover.color;
+    ctx.fillRect(mover.x, mover.y, mover.w, mover.h);
+  }
+}
+
+let last = performance.now();
+function loop(t){
+  const dt = t - last; last = t;
+  update(dt);
+  draw();
+  if(running && !gameOver) requestAnimationFrame(loop);
+}
+
+reset();
+</script>
+</body>
+</html>

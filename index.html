@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gamehub</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&family=Patrick+Hand&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fff;
+      --text: #111;
+      --banner1: #f8f8f8;
+      --banner2: #f2f2f2;
+      --banner3: #eee;
+      --cursor-border: #111;
+    }
+    body.dark {
+      --bg: #121212;
+      --text: #f5f5f5;
+      --banner1: #1e1e1e;
+      --banner2: #222;
+      --banner3: #2a2a2a;
+      --cursor-border: #f5f5f5;
+    }
+    body {
+      margin: 0;
+      font-family: 'Patrick Hand', cursive;
+      background: var(--bg);
+      color: var(--text);
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    header {
+      text-align: center;
+      padding: 40px 20px 20px;
+      position: relative;
+    }
+    .logo-text {
+      font-family: 'Gloria Hallelujah', cursive;
+      font-size: 3rem;
+      font-weight: normal;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+    }
+    .made-by-header {
+      font-family: 'Gloria Hallelujah', cursive;
+      font-size: 1.1rem;
+      margin: 0;
+      animation: wiggle 3s infinite ease-in-out;
+    }
+    .dark-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 44px;
+      height: 44px;
+      border: 2px solid var(--text);
+      border-radius: 50%;
+      background: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .dark-toggle svg {
+      width: 24px;
+      height: 24px;
+      fill: var(--text);
+    }
+    .games-container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+      position: relative;
+    }
+    .games {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .games.hidden {
+      display: none;
+    }
+    .banner {
+      display: block;
+      padding: 50px 20px;
+      text-align: center;
+      font-size: 1.8rem;
+      border-radius: 12px;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--banner1);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .banner:nth-child(2) { background: var(--banner2); }
+    .banner:nth-child(3) { background: var(--banner3); }
+    .banner:nth-child(4) { background: var(--banner1); }
+    .banner:nth-child(5) { background: var(--banner2); }
+    .banner:nth-child(6) { background: var(--banner3); }
+    .banner:nth-child(7) { background: var(--banner1); }
+    .banner:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 30px;
+      margin: 40px 0 20px;
+    }
+    
+    .page-nav {
+      width: 50px;
+      height: 50px;
+      border: 3px solid var(--text);
+      background: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .page-nav:hover {
+      transform: translateY(-2px) rotate(5deg);
+      background: var(--banner1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .page-nav:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .page-nav:disabled:hover {
+      background: none;
+      box-shadow: none;
+    }
+    
+    /* Hand-drawn arrow styles */
+    .arrow {
+      width: 24px;
+      height: 24px;
+      stroke: var(--text);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+    
+    .page-info {
+      font-family: 'Gloria Hallelujah', cursive;
+      font-size: 1.2rem;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    #gameView {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: var(--bg);
+      display: none;
+      flex-direction: column;
+      z-index: 1000;
+      animation: fadeIn 0.3s ease;
+    }
+    #gameFrame {
+      flex: 1;
+      width: 100%;
+      border: none;
+    }
+    #backBtn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid var(--text);
+      background: var(--bg);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1100;
+      transition: background 0.3s ease, border 0.3s ease;
+    }
+    #backBtn svg {
+      width: 24px;
+      height: 24px;
+      fill: var(--text);
+    }
+    #backBtn:hover {
+      background: var(--banner2);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    footer {
+      text-align: center;
+      margin: 40px 0 20px;
+      font-size: 1.3rem;
+      font-family: 'Gloria Hallelujah', cursive;
+    }
+    
+    .social-links {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .social-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border: 2px solid var(--text);
+      border-radius: 50%;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      background: transparent;
+    }
+    
+    .social-link:hover {
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      background: var(--banner1);
+    }
+    
+    .social-link svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--text);
+      transition: fill 0.3s ease;
+    }
+    
+    .social-link.github:hover {
+      border-color: #333;
+      background: #333;
+    }
+    .social-link.github:hover svg {
+      fill: #fff;
+    }
+    
+    .social-link.twitter:hover {
+      border-color: #1da1f2;
+      background: #1da1f2;
+    }
+    .social-link.twitter:hover svg {
+      fill: #fff;
+    }
+    
+    .social-link.instagram:hover {
+      border-color: #e4405f;
+      background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    }
+    .social-link.instagram:hover svg {
+      fill: #fff;
+    }
+    
+    .social-link.youtube:hover {
+      border-color: #ff0000;
+      background: #ff0000;
+    }
+    .social-link.youtube:hover svg {
+      fill: #fff;
+    }
+    
+    .social-link.discord:hover {
+      border-color: #7289da;
+      background: #7289da;
+    }
+    .social-link.discord:hover svg {
+      fill: #fff;
+    }
+    
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(-2deg); }
+      50% { transform: rotate(2deg); }
+    }
+    
+    @media (max-width: 480px) {
+      .social-links {
+        gap: 12px;
+      }
+      .social-link {
+        width: 36px;
+        height: 36px;
+      }
+      .social-link svg {
+        width: 18px;
+        height: 18px;
+      }
+      .pagination {
+        gap: 20px;
+      }
+      .page-nav {
+        width: 44px;
+        height: 44px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 class="logo-text">Gamehub</h1>
+    <p class="made-by-header">✨ Made by Chadibego ✨</p>
+    <button class="dark-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">
+      <svg id="darkIcon" viewBox="0 0 24 24"><path d="M12 2a9.93 9.93 0 00-7.07 2.93C2.93 6.93 2 9.39 2 12s.93 5.07 2.93 7.07A9.93 9.93 0 0012 22c.34 0 .67-.02 1-.07a9 9 0 010-17.86A9.93 9.93 0 0012 2z"/></svg>
+    </button>
+  </header>
+
+  <main class="games-container">
+    <!-- Page 1 -->
+    <div class="games" id="page1">
+      <a href="#" class="banner" onclick="openGame('Dodger.html')">Dodge the Blocks</a>
+      <a href="#" class="banner" onclick="openGame('Snake Lite.html')">Snake Lite</a>
+      <a href="#" class="banner" onclick="openGame('Falling Walls.html')">Falling Walls</a>
+      <a href="#" class="banner" onclick="openGame('memory_flip_emoji_arcade_v1.html')">Memory Flip</a>
+      <a href="#" class="banner" onclick="openGame('stack_builder_ultra_slow_animated_instant_restart_hintfix.html')">Stack Builder</a>
+      <a href="#" class="banner" onclick="openGame('Paddel Smashers.html')">Paddle Smash</a>
+    </div>
+
+    <!-- Page 2 -->
+    <div class="games hidden" id="page2">
+      <a href="#" class="banner" onclick="openGame('Color Catch.html')">Color Catch</a>
+      <a href="#" class="banner" onclick="openGame('Bubble_Pop.html')">Bubble Pop</a>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination">
+      <button class="page-nav" id="prevBtn" onclick="previousPage()">
+        <svg class="arrow" viewBox="0 0 24 24">
+          <path d="M15.5 18.2c0.1 0.1 0.1 0.2 0 0.3l-0.3 0.3c-0.1 0.1-0.2 0.1-0.3 0L8.8 12.4c-0.1-0.1-0.1-0.2 0-0.3l6.1-6.4c0.1-0.1 0.2-0.1 0.3 0l0.3 0.3c0.1 0.1 0.1 0.2 0 0.3L9.8 12L15.5 18.2z" stroke-dasharray="2,1"/>
+        </svg>
+      </button>
+      
+      <div class="page-info">
+        <span id="currentPage">1</span> / <span id="totalPages">2</span>
+      </div>
+      
+      <button class="page-nav" id="nextBtn" onclick="nextPage()">
+        <svg class="arrow" viewBox="0 0 24 24">
+          <path d="M8.5 5.8c-0.1-0.1-0.1-0.2 0-0.3l0.3-0.3c0.1-0.1 0.2-0.1 0.3 0l6.1 6.4c0.1 0.1 0.1 0.2 0 0.3l-6.1 6.4c-0.1 0.1-0.2 0.1-0.3 0l-0.3-0.3c-0.1-0.1-0.1-0.2 0-0.3L14.2 12L8.5 5.8z" stroke-dasharray="2,1"/>
+        </svg>
+      </button>
+    </div>
+  </main>
+
+  <footer>
+    <div class="social-links">
+      <a href="https://github.com/Chadibego" class="social-link github" target="_blank" title="GitHub">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+        </svg>
+      </a>
+      
+      <a href="https://www.instagram.com/chadi_bego/" class="social-link instagram" target="_blank" title="Instagram">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+        </svg>
+      </a>
+      
+      <a href="https://www.youtube.com/@Chadibego" class="social-link youtube" target="_blank" title="YouTube">
+        <svg viewBox="0 0 24 24">
+          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+        </svg>
+      </a>
+    </div>
+  </footer>
+
+  <div id="gameView">
+    <button id="backBtn" onclick="closeGame()">
+      <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <iframe id="gameFrame"></iframe>
+  </div>
+
+  <script>
+    const darkIcon = document.getElementById("darkIcon");
+    const gameView = document.getElementById("gameView");
+    const gameFrame = document.getElementById("gameFrame");
+    const footer = document.querySelector("footer");
+    
+    let currentPageNum = 1;
+    const totalPagesNum = 2;
+
+    function updatePagination() {
+      document.getElementById('currentPage').textContent = currentPageNum;
+      document.getElementById('prevBtn').disabled = currentPageNum === 1;
+      document.getElementById('nextBtn').disabled = currentPageNum === totalPagesNum;
+      
+      // Show/hide pages
+      for (let i = 1; i <= totalPagesNum; i++) {
+        const page = document.getElementById(`page${i}`);
+        if (i === currentPageNum) {
+          page.classList.remove('hidden');
+        } else {
+          page.classList.add('hidden');
+        }
+      }
+    }
+
+    function nextPage() {
+      if (currentPageNum < totalPagesNum) {
+        currentPageNum++;
+        updatePagination();
+      }
+    }
+
+    function previousPage() {
+      if (currentPageNum > 1) {
+        currentPageNum--;
+        updatePagination();
+      }
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark");
+      if (document.body.classList.contains("dark")) {
+        darkIcon.innerHTML = '<path d="M6.76 4.84l-1.8-1.79L4.22 4.8 6 6.59l.76-1.75zm10.48 0l.76 1.75L20 6.59l-1.76-1.79-1.8 1.79zM12 4a1 1 0 110-2 1 1 0 010 2zm8 8a1 1 0 110-2 1 1 0 010 2zm-8 10a1 1 0 110-2 1 1 0 010 2zm-6.24-2.84L4 17.41l1.76-1.79 1.8 1.79-1.8 1.75zM18 17.41l1.76 1.75-1.8 1.79-1.76-1.75 1.8-1.79zM12 18a6 6 0 100-12 6 6 0 000 12z"/>';
+      } else {
+        darkIcon.innerHTML = '<path d="M12 2a9.93 9.93 0 00-7.07 2.93C2.93 6.93 2 9.39 2 12s.93 5.07 2.93 7.07A9.93 9.93 0 0012 22c.34 0 .67-.02 1-.07a9 9 0 010-17.86A9.93 9.93 0 0012 2z"/>';
+      }
+    }
+
+    function openGame(file) {
+      gameFrame.src = file;
+      gameView.style.display = "flex";
+      document.querySelector(".games-container").style.display = "none";
+      footer.style.display = "none";
+
+      gameFrame.onload = () => {
+        gameFrame.contentWindow.focus();
+      };
+    }
+
+    function closeGame() {
+      gameFrame.src = "";
+      gameView.style.display = "none";
+      document.querySelector(".games-container").style.display = "block";
+      footer.style.display = "block";
+    }
+
+    // Initialize pagination
+    updatePagination();
+  </script>
+</body>
+</html>

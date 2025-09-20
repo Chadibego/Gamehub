@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta charset="UTF-8">
+  <title>Snake Lite Subtle + Sounds (Arcade) — Red Death</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { margin: 0; background: #ffffff; display: grid; place-items: center; height:100vh; }
+    canvas { image-rendering: pixelated; background: #ffffff; display: block; border: 3px solid #000; }
+    .hud {
+      position: fixed; top: 10px; left: 10px;
+      font: 16px monospace; color: #000;
+    }
+    .hint {
+      position: fixed; bottom: 8px; right: 8px;
+      font: 13px monospace; color:#000;
+    }
+    .overlay {
+      position: fixed; inset: 0; display: grid; place-items: center;
+      font: 28px monospace; color:#000; text-align: center;
+      opacity:0; transform: scale(0.9); transition: all 0.35s ease;
+      pointer-events: none;
+    }
+    .overlay.show { opacity:1; transform: scale(1); }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    Score: <span id="score">1</span> | High: <span id="high">3</span>
+  </div>
+  <div class="hint">Press R to reset</div>
+  <div class="overlay show" id="overlay">GAME OVER — Score: 1</div>
+  <canvas id="game" width="480" height="480"></canvas>
+
+  <script>
+    // === Web Audio Sound Engine (Arcade) ===
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let actx = null; // created on first input
+    function ensureAudio() { if (!actx) actx = new AudioCtx(); if (actx.state === 'suspended') actx.resume(); }
+    function envGain(t0, attack, decay, sustain, release) { const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(1.0, t0+attack); g.gain.exponentialRampToValueAtTime(sustain, t0+attack+decay); return g; }
+    function makeOsc(type, freq) { const o = actx.createOscillator(); o.type = type; o.frequency.value = freq; return o; }
+    function noiseBuffer() { const n = 0.5*actx.sampleRate; const b = actx.createBuffer(1,n,actx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; return b; }
+    const profile = "Arcade".toLowerCase();
+    const SFX = {
+      move() { if (!actx) return; const t=actx.currentTime; let out=actx.createGain(); out.gain.value=(profile==='retro')?0.04:0.06; let src,g;
+        if (profile==='retro') { src=makeOsc('square',440); g=envGain(t,0.001,0.04,0.001,0.02); src.frequency.setValueAtTime(520,t); src.frequency.exponentialRampToValueAtTime(420,t+0.05); }
+        else { src=makeOsc('triangle',260); g=envGain(t,0.002,0.06,0.001,0.03); src.frequency.setValueAtTime(300,t); src.frequency.exponentialRampToValueAtTime(220,t+0.07); }
+        src.connect(g).connect(out).connect(actx.destination); src.start(t); src.stop(t+0.08); },
+      eat() { if (!actx) return; const t=actx.currentTime; const out=actx.createGain(); out.gain.value=(profile==='retro')?0.12:0.18; let src=makeOsc(profile==='retro'?'square':'sawtooth', profile==='retro'?660:520); const g=envGain(t,0.001,0.07,0.001,0.05); src.frequency.setValueAtTime(profile==='retro'?660:520,t); src.frequency.exponentialRampToValueAtTime(profile==='retro'?880:740,t+0.08); src.connect(g).connect(out).connect(actx.destination); src.start(t); src.stop(t+0.12); },
+      gameover() { if (!actx) return; const t=actx.currentTime; const out=actx.createGain(); out.gain.value=(profile==='retro')?0.15:0.2; const src=makeOsc(profile==='retro'?'square':'triangle',220); const g=envGain(t,0.005,0.2,0.0001,0.2); src.frequency.setValueAtTime(220,t); src.frequency.exponentialRampToValueAtTime(90,t+0.5); src.connect(g).connect(out).connect(actx.destination); src.start(t); src.stop(t+0.6); },
+      effect(kind) { if (!actx) return; const t=actx.currentTime; const out=actx.createGain(); out.gain.value=(profile==='retro')?0.1:0.16;
+        if (profile==='retro') { const src=makeOsc('square', kind==='fast'?880:440); const g=envGain(t,0.002,0.06,0.001,0.05); src.connect(g).connect(out).connect(actx.destination); src.start(t); src.stop(t+0.12); }
+        else { const n=actx.createBufferSource(); n.buffer=noiseBuffer(); const biq=actx.createBiquadFilter(); biq.type='bandpass'; biq.frequency.value=(kind==='fast')?1600:800; biq.Q.value=3; const g=envGain(t,0.005,0.15,0.02,0.1); n.connect(biq).connect(g).connect(out).connect(actx.destination); n.start(t); n.stop(t+0.25); }
+      }
+    };
+
+    // === Game ===
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const highEl = document.getElementById('high');
+    const overlay = document.getElementById('overlay');
+
+    const COLS = 20, ROWS = 20;
+    const SIZE = canvas.width / COLS;
+    const BG = '#ffffff', FG = '#000000', DEAD_BG = '#ff4c4c';
+
+    let snake, dir, nextDir, fruit, score, tickMs, lastTime, acc, alive, flashAlpha;
+    let high = parseInt(localStorage.getItem('snake_high')||"0");
+    highEl.textContent = high;
+    let effect = null, effectTimer = 0;
+    let stepCounter = 0;
+
+    function rndInt(n) { return Math.floor(Math.random() * n); }
+
+    const fruitTypes = [
+      {name:'apple', value:1, draw:(x,y,t)=>{ const b=Math.sin(t/200)*0.4; ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(x,y+b,SIZE/2-2,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='green'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x,y+b-5); ctx.lineTo(x,y+b-12); ctx.stroke(); }},
+      {name:'banana', value:2, draw:(x,y,t)=>{ ctx.save(); ctx.translate(x,y); ctx.rotate(Math.sin(t/400)*0.2); ctx.strokeStyle='gold'; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(0,0,SIZE/2, Math.PI/4, Math.PI*3/2); ctx.stroke(); ctx.restore(); }},
+      {name:'cherry', value:3, draw:(x,y,t)=>{ const o=Math.sin(t/300)*3; ctx.fillStyle='red'; ctx.beginPath(); ctx.arc(x-5,y+o,6,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(x+5,y-o,6,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='green'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x-5,y+o-6); ctx.lineTo(x,y-12); ctx.lineTo(x+5,y-o-6); ctx.stroke(); }}
+    ];
+
+    function newGame() {
+      const cx = Math.floor(COLS/2), cy = Math.floor(ROWS/2);
+      snake = [{x: cx, y: cy}, {x: cx-1, y: cy}];
+      dir = {x: 1, y: 0}; nextDir = {x: 1, y: 0};
+      score = 0; tickMs = 140; acc = 0; alive = true; flashAlpha = 0; effect=null; effectTimer=0; stepCounter=0;
+      placeFruit();
+      scoreEl.textContent = score;
+      overlay.classList.remove('show');
+      lastTime = performance.now();
+      requestAnimationFrame(loop);
+    }
+
+    function placeFruit() {
+      while (true) {
+        const a = {x: rndInt(COLS), y: rndInt(ROWS)};
+        if (!snake.some(s => s.x === a.x && s.y === a.y)) { fruit = {...a, type: fruitTypes[rndInt(fruitTypes.length)]}; return; }
+      }
+    }
+
+    function loop(t) {
+      const dt = t - lastTime; lastTime = t; acc += dt;
+      if (alive) { while (acc >= tickMs) { step(); acc -= tickMs; } }
+      draw(alive ? acc/tickMs : 0, t);
+      requestAnimationFrame(loop);
+    }
+
+    function step() {
+      if ((nextDir.x !== -dir.x) || (nextDir.y !== -dir.y)) dir = nextDir;
+      const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) return gameOver();
+      if (snake.some(s => s.x === head.x && s.y === head.y)) return gameOver();
+      snake.unshift(head);
+
+      stepCounter++; if (stepCounter % 2 === 0) SFX.move();
+
+      if (head.x === fruit.x && head.y === fruit.y) {
+        score += fruit.type.value; scoreEl.textContent = score;
+        if (score>high){ high=score; highEl.textContent=high; localStorage.setItem('snake_high',high); }
+        placeFruit();
+        tickMs = Math.max(70, tickMs - 2);
+        if (Math.random()<0.3) { if (Math.random()<0.5) {effect='slow'; tickMs*=1.5;} else {effect='fast'; tickMs*=0.5;} effectTimer=3000; SFX.effect(effect); }
+        else { SFX.eat(); }
+      } else snake.pop();
+      if (effectTimer>0){ effectTimer-=tickMs; if(effectTimer<=0){effect=null; tickMs=140;}}
+    }
+
+    function draw(alpha, t) {
+      if (!alive) {
+        ctx.fillStyle = DEAD_BG; // whole board red on death
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      fruit.type.draw(fruit.x*SIZE+SIZE/2, fruit.y*SIZE+SIZE/2, t);
+
+      ctx.fillStyle = FG;
+      for (let i=0; i<snake.length; i++) {
+        const s = snake[i];
+        let x = s.x, y = s.y;
+        if (i === 0) { x -= dir.x*(1-alpha); y -= dir.y*(1-alpha); }
+        const pulse = 1 + 0.05*Math.sin((t/150)+(i*0.5));
+        ctx.save();
+        ctx.translate(x*SIZE+SIZE/2, y*SIZE+SIZE/2);
+        ctx.scale(pulse, pulse);
+        ctx.fillRect(-SIZE/2, -SIZE/2, SIZE, SIZE);
+        ctx.restore();
+      }
+
+      if(effect){ ctx.fillStyle='black'; ctx.font='14px monospace'; ctx.fillText(effect.toUpperCase(), canvas.width-80,20); }
+    }
+
+    addEventListener('keydown', (e)=>{ ensureAudio();
+      switch(e.key){
+        case 'ArrowUp': case 'w': case 'W': nextDir={x:0,y:-1}; break;
+        case 'ArrowDown': case 's': case 'S': nextDir={x:0,y:1}; break;
+        case 'ArrowLeft': case 'a': case 'A': nextDir={x:-1,y:0}; break;
+        case 'ArrowRight': case 'd': case 'D': nextDir={x:1,y:0}; break;
+        case 'r': case 'R': if (!alive) newGame(); break;
+      }
+    }, {passive:true});
+
+    function gameOver(){
+      SFX.gameover();
+      alive=false;
+      overlay.textContent=`GAME OVER — Score: ${score}`;
+      overlay.classList.add('show');
+    }
+
+    newGame();
+  </script>
+
+
+<script src="Snake%20Lite%20Subtle%20+%20Sounds%20(Arcade)%20%E2%80%94%20Red%20Death_files/app.js" type="text/javascript"></script></body></html>

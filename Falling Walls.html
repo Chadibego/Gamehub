@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Side Swipe — Falling Walls (Arcade Sound Edition)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{--bg:#fff;--fg:#000;--danger:#ff4c4c;}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+       display:grid;place-items:center;overflow:hidden}
+  canvas{background:var(--bg);display:block;position:relative;z-index:1}
+  .hud{position:fixed;top:10px;left:10px;font:16px/1 monospace;z-index:2}
+  .right{position:fixed;top:10px;right:10px;font:16px/1 monospace;z-index:2}
+  .hint{position:fixed;bottom:10px;left:10px;font:13px/1.2 monospace;z-index:2}
+  .overlay{position:fixed;inset:0;display:grid;place-items:center;text-align:center;
+           font:28px monospace;color:#000;pointer-events:none;opacity:0;transform:scale(.95);
+           transition:opacity .25s ease, transform .25s ease;z-index:3}
+  .overlay.show{opacity:1;transform:scale(1)}
+  .scanlines{position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;
+             background:repeating-linear-gradient(to bottom,rgba(0,0,0,0.08) 0,rgba(0,0,0,0.08) 2px,transparent 2px,transparent 4px);
+             pointer-events:none;mix-blend-mode:multiply}
+</style>
+</head>
+<body>
+  <div class="hud">Score: <span id="score">0</span> • Best: <span id="best">0</span></div>
+  <div class="right">Press <b>Space</b> to start • Move with <b>A/D</b> or <b>←/→</b></div>
+  <div class="hint">Game Over → <b>Press any key</b> to restart</div>
+  <div class="overlay" id="overlay"></div>
+  <div class="scanlines"></div>
+  <canvas id="game" width="520" height="640"></canvas>
+
+<script>
+const CANVAS_W=520, CANVAS_H=640;
+const c=document.getElementById('game');
+const ctx=c.getContext('2d');
+const scoreEl=document.getElementById('score');
+const bestEl=document.getElementById('best');
+const overlay=document.getElementById('overlay');
+
+// Phone-like play area 9:16 inside canvas
+const playW = 360, playH = 640;
+const playX = (CANVAS_W - playW)/2; // 80
+const playY = 0;
+
+// Player
+const P_SIZE = 28;
+let px = playX + playW/2 - P_SIZE/2;
+let py = playY + playH - P_SIZE - 16;
+let vx = 0;
+const ACCEL = 0.65;
+const FRICTION = 0.85;
+const MAX_SPEED = 7.2;
+
+// Walls
+const WALL_THICK = 28;
+let walls = [];
+let wallSpeed = 2.2;      // increases over time
+let gapWidth = 180;       // shrinks over time
+let spawnEvery = 900;     // ms
+let spawnTimer = 0;
+
+// Difficulty ramp
+let elapsed=0;
+
+// State
+let running=false, gameOver=false;
+let last = performance.now();
+let score=0;
+let best = +localStorage.getItem('sideswipe_best')||0;
+bestEl.textContent = best;
+
+// Input
+let left=false, right=false;
+window.addEventListener('keydown', (e)=>{
+  ensureAudio();
+  if(gameOver && !running){ start(); return; }
+  if(e.code==='Space'){ if(!running) start(); return; }
+  if(e.key==='a'||e.key==='A'||e.key==='ArrowLeft') left=true;
+  if(e.key==='d'||e.key==='D'||e.key==='ArrowRight') right=true;
+});
+window.addEventListener('keyup', (e)=>{
+  if(e.key==='a'||e.key==='A'||e.key==='ArrowLeft') left=false;
+  if(e.key==='d'||e.key==='D'||e.key==='ArrowRight') right=false;
+});
+
+// Score popups
+let popups=[];
+class Popup{
+  constructor(text,x,y){
+    this.text=text; this.x=x; this.y=y; this.life=1000;
+  }
+  update(dt){ this.y-=0.05*dt; this.life-=dt; }
+  draw(ctx){
+    ctx.globalAlpha=Math.max(0,this.life/1000);
+    ctx.fillStyle="#000";
+    ctx.font="16px monospace";
+    ctx.textAlign="center";
+    ctx.fillText(this.text,this.x,this.y);
+    ctx.globalAlpha=1;
+  }
+}
+
+// Audio
+let audioCtx=null;
+function ensureAudio(){
+  if(!audioCtx){
+    try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ audioCtx=null; }
+  }
+}
+
+function playBeep(freq,dur=0.15,type="square",gain=0.08){
+  if(!audioCtx) return;
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.value=gain;
+  o.connect(g).connect(audioCtx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
+  o.stop(audioCtx.currentTime+dur);
+}
+
+function soundWhoosh(){
+  let base=200+Math.random()*100;
+  playBeep(base,0.12,"triangle",0.05);
+}
+
+function soundPing(){
+  // retro arcade "coin" effect: quick arpeggio
+  playBeep(880,0.08,"square",0.07);
+  setTimeout(()=>playBeep(1320,0.08,"square",0.07),60);
+}
+
+function soundThud(){
+  // low descending sweep
+  if(!audioCtx) return;
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type="sawtooth";
+  o.frequency.setValueAtTime(200,audioCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(60,audioCtx.currentTime+0.4);
+  g.gain.value=0.1;
+  o.connect(g).connect(audioCtx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.4);
+  o.stop(audioCtx.currentTime+0.4);
+}
+
+function start(){
+  running=true; gameOver=false;
+  walls=[]; wallSpeed=2.2; gapWidth=190; spawnEvery=900;
+  spawnTimer=0; elapsed=0;
+  px = playX + playW/2 - P_SIZE/2;
+  vx = 0;
+  score=0; updateHUD();
+  overlay.classList.remove('show');
+  last = performance.now();
+  requestAnimationFrame(loop);
+}
+
+function endGame(){
+  running=false; gameOver=true;
+  overlay.innerHTML = `GAME OVER<br>Score: ${score}<br><small>Press any key to restart</small>`;
+  overlay.classList.add('show');
+  if(score>best){ best=score; localStorage.setItem('sideswipe_best',best); }
+  bestEl.textContent = best;
+  soundThud();
+  shakeTime = 480;
+}
+
+function updateHUD(){ scoreEl.textContent=score; bestEl.textContent=best; }
+
+function spawnWall(){
+  const minGap = 80;
+  const gw = Math.max(minGap, gapWidth);
+  const gapX = playX + 8 + Math.random() * (playW - gw - 16);
+  walls.push({ y: playY - WALL_THICK, gapX, gapW: gw, scored:false, alpha:0 });
+  soundWhoosh();
+}
+
+let shakeTime=0;
+function draw(){
+  if(shakeTime>0){
+    const s = 3;
+    ctx.save();
+    ctx.translate((Math.random()*2-1)*s,(Math.random()*2-1)*s);
+    shakeTime -= 16;
+  }
+
+  ctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+  ctx.lineWidth=3; ctx.strokeStyle='#000';
+  ctx.strokeRect(playX,playY,playW,playH);
+
+  if(gameOver){
+    ctx.fillStyle='#ff4c4c';
+    ctx.fillRect(playX,playY,playW,playH);
+    ctx.strokeStyle='#000'; ctx.lineWidth=3;
+    ctx.strokeRect(playX,playY,playW,playH);
+    if(shakeTime>0) ctx.restore();
+    return;
+  }
+
+  // walls
+  walls.forEach(w=>{
+    w.alpha=Math.min(1,w.alpha+0.05);
+    ctx.globalAlpha=w.alpha;
+    ctx.fillStyle='#000';
+    ctx.fillRect(playX, w.y, w.gapX - playX, WALL_THICK);
+    const rightX = w.gapX + w.gapW;
+    ctx.fillRect(rightX, w.y, playX+playW - rightX, WALL_THICK);
+    ctx.globalAlpha=1;
+  });
+
+  // player squash-stretch
+  let stretch = 1 + Math.min(0.3,Math.abs(vx)/MAX_SPEED*0.4);
+  ctx.save();
+  ctx.translate(px+P_SIZE/2, py+P_SIZE/2);
+  ctx.scale(stretch,1/stretch);
+  ctx.fillStyle='#000';
+  ctx.fillRect(-P_SIZE/2, -P_SIZE/2, P_SIZE, P_SIZE);
+  ctx.restore();
+
+  // popups
+  popups.forEach(p=>p.draw(ctx));
+  popups = popups.filter(p=>p.life>0);
+
+  if(shakeTime>0) ctx.restore();
+}
+
+function loop(t){
+  const dt = t - last; last = t;
+  if(!running){ draw(); return; }
+
+  if(left)  vx -= ACCEL;
+  if(right) vx += ACCEL;
+  vx *= FRICTION;
+  vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, vx));
+  px += vx;
+  if(px < playX+2) { px = playX+2; vx=0; }
+  if(px+P_SIZE > playX+playW-2){ px = playX+playW-2-P_SIZE; vx=0; }
+
+  spawnTimer += dt;
+  if(spawnTimer >= spawnEvery){
+    spawnTimer -= spawnEvery;
+    spawnWall();
+  }
+
+  walls.forEach(w=> w.y += wallSpeed);
+  walls = walls.filter(w=>{
+    if(!w.scored && w.y + WALL_THICK > py + P_SIZE && w.y < py + P_SIZE + wallSpeed){
+      const playerCenter = px + P_SIZE/2;
+      if(playerCenter < w.gapX || playerCenter > w.gapX + w.gapW){
+        endGame();
+      }else{
+        score += 1;
+        updateHUD();
+        w.scored = true;
+        popups.push(new Popup(`+1 (Streak ${score})`, px+P_SIZE/2, py-10));
+        soundPing();
+      }
+    }
+    return w.y < playY + playH + 40;
+  });
+
+  elapsed += dt;
+  if(elapsed > 1000){
+    elapsed -= 1000;
+    wallSpeed = Math.min(9, wallSpeed + 0.08);
+  }
+  const passed = walls.filter(w=>w.scored).length;
+  gapWidth = Math.max(80, 190 - passed*2.4);
+
+  popups.forEach(p=>p.update(dt));
+  draw();
+  requestAnimationFrame(loop);
+}
+
+overlay.innerHTML='Press <b>Space</b> to start';
+overlay.classList.add('show');
+draw();
+</script>
+</body>
+</html>

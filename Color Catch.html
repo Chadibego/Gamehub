@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<!-- saved from url=(0066)file:///C:/Users/cynthia/Downloads/Color_Catch_no_shake_wrong.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Color Catch — Pastel Arcade</title>
+<style>
+  :root{--bg:#fff;--fg:#000}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
+  .wrap{height:100%;display:flex;align-items:center;justify-content:center}
+  canvas{background:var(--bg);border:4px solid var(--fg);box-shadow:0 12px 30px rgba(0,0,0,0.08);display:block}
+  #hud{position:fixed;left:18px;top:16px;font-weight:400}
+  #hint{position:fixed;right:18px;top:14px;font-size:13px;opacity:0.75}
+  #center{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center}
+  .btn{display:inline-block;margin-top:12px;padding:8px 12px;border:2px solid var(--fg);cursor:pointer}
+  @media (max-width:600px){canvas{width:360px;height:600px}}
+</style>
+</head>
+<body>
+  <div id="hud">Score: <span id="score">2</span> &nbsp;|&nbsp; Lives: <span id="lives">0</span> &nbsp;|&nbsp; Best: <span id="best">13</span></div>
+  <div id="hint">← → or A D • Space to start • R restart</div>
+  <div class="wrap">
+    <canvas id="c" width="420" height="600" aria-label="Color Catch pastel arcade"></canvas>
+  </div>
+  <div id="center"><div style="font-weight:800;font-size:28px">Game Over</div><div style="margin-top:6px;font-size:18px">Score: 2</div><div style="margin-top:4px;font-size:16px">Best: 13</div><div style="opacity:0.8;margin-top:8px">No lives remaining!</div><div style="opacity:0.85;margin-top:10px">Press R to restart</div></div>
+<script>
+// Color Catch — pastel arcade
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const scoreEl = document.getElementById('score');
+const livesEl = document.getElementById('lives');
+const bestEl = document.getElementById('best');
+const center = document.getElementById('center');
+
+// Pastel colors
+const pastelColors = ['#FFB6C1', '#E6E6FA', '#98FB98', '#F0E68C', '#FFA07A', '#87CEEB', '#DDA0DD', '#F5DEB3', '#90EE90', '#FFE4E1'];
+
+// Audio helper
+const ac = new (window.AudioContext||window.webkitAudioContext)();
+function sfx(f=440, t=0.08, type='square', vol=0.08, glide=0){
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, ac.currentTime);
+  if(glide) o.frequency.exponentialRampToValueAtTime(f*glide, ac.currentTime+t);
+  g.gain.setValueAtTime(vol, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+t);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + t);
+}
+
+let state = {
+  paddle: { w: 80, h: 16, x: (W-80)/2, y: H-40, speed: 8, color: pastelColors[0] },
+  fallingObjects: [],
+  particles: [],
+  score: 0,
+  lives: 5,
+  best: +localStorage.getItem('color_catch_best') || 0,
+  running: false,
+  gameOver: false,
+  screenShake: 0,
+  comboCount: 0,
+  comboTimer: 0,
+  spawnTimer: 0,
+  spawnDelay: 1200,
+  difficulty: 1,
+  gameTime: 0
+};
+bestEl.textContent = state.best;
+livesEl.textContent = state.lives;
+
+// input
+const keys = {};
+window.addEventListener('keydown', e=>{ 
+  keys[e.key]=true; 
+  if(e.key===' ' && !state.running && !state.gameOver) start(); 
+  if(e.key==='r'||e.key==='R') reset();
+});
+window.addEventListener('keyup', e=> keys[e.key]=false);
+
+function start(){ 
+  state.running = true; 
+  center.innerHTML='';
+  state.paddle.color = pastelColors[Math.floor(Math.random() * pastelColors.length)];
+  spawnObject();
+}
+
+function reset(){ 
+  state.paddle.x = (W-state.paddle.w)/2;
+  state.paddle.color = pastelColors[0];
+  state.fallingObjects = [];
+  state.particles = [];
+  state.score = 0; 
+  state.lives = 5;
+  state.running = false; 
+  state.gameOver = false; 
+  state.screenShake = 0;
+  state.comboCount = 0;
+  state.comboTimer = 0;
+  state.spawnTimer = 0;
+  state.spawnDelay = 1200;
+  state.difficulty = 1;
+  state.gameTime = 0;
+  scoreEl.textContent = '0';
+  livesEl.textContent = '5'; 
+  center.innerHTML = '<div style="font-weight:700;font-size:20px">Color Catch</div><div style="opacity:0.8;margin-top:8px">Catch matching colors with your paddle!</div><div style="opacity:0.6;margin-top:6px">Press Space to start</div>'; 
+}
+
+
+function spawnObject(){
+  if(!state.running) return;
+
+  // Fewer spawns at the start, more as difficulty increases
+  let minCount = 1;
+  let maxCount = 2;
+
+  if (state.difficulty >= 3) { 
+    minCount = 2; maxCount = 3;
+  }
+  if (state.difficulty >= 6) { 
+    minCount = 3; maxCount = 5;
+  }
+
+  const count = Math.floor(Math.random() * (maxCount - minCount + 1)) + minCount;
+
+  for (let n = 0; n < count; n++) {
+    const size = 20 + Math.random() * 15;
+
+    let x, safe = false, attempts = 0;
+    while (!safe && attempts < 50) {
+      x = size/2 + Math.random() * (W - size);
+      safe = true;
+      // Check distance from already-spawned objects (current batch + existing ones)
+      for (let other of state.fallingObjects) {
+        if (Math.abs(x - other.x) < size * 2) {
+          safe = false;
+          break;
+        }
+      }
+      attempts++;
+    }
+
+    // 50% chance to match paddle color, 50% random color
+    let color;
+    if (Math.random() < 0.5) {
+      color = state.paddle.color;
+    } else {
+      color = pastelColors[Math.floor(Math.random() * pastelColors.length)];
+    }
+
+    // Falling speed scales with difficulty
+    const speed = 2 + Math.random() * 2 + (state.difficulty * 1.2);
+
+    state.fallingObjects.push({
+      x, y: -size, size, color, speed,
+      rotation: 0,
+      rotSpeed: (Math.random() - 0.5) * 0.1,
+      wobble: Math.random() * Math.PI * 2,
+      trail: []
+    });
+
+    // Particles per spawn
+    for(let i = 0; i < 6; i++){
+      state.particles.push({
+        x: x + (Math.random()-0.5)*30,
+        y: -size/2,
+        vx: (Math.random()-0.5)*4,
+        vy: Math.random()*3+1,
+        life: 1,
+        size: Math.random()*3+1,
+        color: color
+      });
+    }
+  }
+
+  sfx(300 + Math.random()*200, 0.05, 'triangle', 0.04);
+}
+
+
+function spawnParticles(x, y, color, count=15){
+  for(let i=0; i<count; i++){
+    state.particles.push({
+      x, y,
+      vx: (Math.random()-0.5)*8,
+      vy: (Math.random()-0.5)*8,
+      life: 1,
+      size: 2+Math.random()*4,
+      color: color
+    });
+  }
+}
+
+function changePaddleColor(){
+  let newColor;
+  do {
+    newColor = pastelColors[Math.floor(Math.random() * pastelColors.length)];
+  } while(newColor === state.paddle.color && pastelColors.length > 1);
+  
+  state.paddle.color = newColor;
+  sfx(660, 0.1, 'sine', 0.06);
+  
+  // Paddle change particles
+  for(let i = 0; i < 10; i++){
+    state.particles.push({
+      x: state.paddle.x + state.paddle.w/2 + (Math.random()-0.5)*state.paddle.w,
+      y: state.paddle.y,
+      vx: (Math.random()-0.5)*6,
+      vy: -Math.random()*4-2,
+      life: 1,
+      size: 2+Math.random()*3,
+      color: newColor
+    });
+  }
+}
+
+function update(dt){
+  if(state.gameOver){
+    state.screenShake = Math.max(0, state.screenShake-0.8);
+    state.particles.forEach(p=>{
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15;
+      p.life -= 0.015;
+    });
+    state.particles = state.particles.filter(p=>p.life>0);
+    return;
+  }
+
+  if(!state.running) return;
+
+  // Update game time
+  state.gameTime += dt;
+
+  // Paddle movement
+  if((keys['ArrowLeft']||keys['a']||keys['A'])) {
+    state.paddle.x = Math.max(0, state.paddle.x - state.paddle.speed);
+  }
+  if((keys['ArrowRight']||keys['d']||keys['D'])) {
+    state.paddle.x = Math.min(W-state.paddle.w, state.paddle.x + state.paddle.speed);
+  }
+
+  // Update combo timer
+  if(state.comboTimer > 0) {
+    state.comboTimer -= dt;
+    if(state.comboTimer <= 0) {
+      state.comboCount = 0;
+    }
+  }
+
+  // Spawn new objects
+  state.spawnTimer += dt;
+  if(state.spawnTimer >= state.spawnDelay) {
+    state.spawnTimer = 0;
+    spawnObject();
+    
+    // Time-based difficulty increases
+    const timeInSeconds = state.gameTime / 1000;
+    
+    // Decrease spawn delay over time (faster spawning)
+    state.spawnDelay = Math.max(300, 1200 - (timeInSeconds * 15));
+    
+    // Increase difficulty level every 10 seconds
+    state.difficulty = Math.floor(timeInSeconds / 10) + 1;
+  }
+
+  // Update falling objects
+  state.fallingObjects.forEach((obj, index) => {
+    obj.y += obj.speed;
+    obj.rotation += obj.rotSpeed;
+    obj.wobble += 0.08;
+    
+    // Add trail
+    obj.trail.push({x: obj.x, y: obj.y, life: 1, size: obj.size});
+    if(obj.trail.length > 8) obj.trail.shift();
+    obj.trail.forEach(t => t.life -= 0.12);
+    obj.trail = obj.trail.filter(t => t.life > 0);
+
+    // Check paddle collision
+    if(obj.y + obj.size/2 >= state.paddle.y &&
+       obj.y - obj.size/2 <= state.paddle.y + state.paddle.h &&
+       obj.x + obj.size/2 >= state.paddle.x &&
+       obj.x - obj.size/2 <= state.paddle.x + state.paddle.w) {
+      
+      // Remove object
+      state.fallingObjects.splice(index, 1);
+      
+      if(obj.color === state.paddle.color) {
+        // Correct color caught
+        state.comboCount++;
+        state.comboTimer = 2000; // 2 seconds for combo
+        
+        const points = 1 + Math.floor(state.comboCount / 3); // Bonus for combos
+        state.score += points;
+        scoreEl.textContent = state.score;
+        
+        if(state.score > state.best) {
+          state.best = state.score;
+          bestEl.textContent = state.best;
+          localStorage.setItem('color_catch_best', state.best);
+          sfx(1800, 0.15, 'triangle', 0.1);
+        }
+        
+        // Success sound with combo pitch
+        const pitch = 800 + (state.comboCount * 100);
+        sfx(pitch, 0.1, 'square', 0.08, 0.8);
+        
+        spawnParticles(obj.x, obj.y, obj.color, 20);
+        changePaddleColor();
+        
+      } else {
+        // Wrong color caught - lose a life (no screen shake)
+        state.lives--;
+        livesEl.textContent = state.lives;
+
+        sfx(200, 0.25, 'sawtooth', 0.1, 1.5);
+        spawnParticles(obj.x, obj.y, '#ff4c4c', 20);
+
+        if (state.lives <= 0) {
+          state.gameOver = true;
+          state.running = false;
+          state.screenShake = 25; // still shake on final game over
+          center.innerHTML = '<div style="font-weight:800;font-size:28px">Game Over</div>' +
+            '<div style="margin-top:6px;font-size:18px">Score: ' + state.score + '</div>' +
+            '<div style="margin-top:4px;font-size:16px">Best: ' + state.best + '</div>' +
+            '<div style="opacity:0.8;margin-top:8px">No lives remaining!</div>' +
+            '<div style="opacity:0.85;margin-top:10px">Press R to restart</div>';
+        }
+      }
+    }
+
+    // Remove objects that fell off screen
+    if(obj.y - obj.size > H) {
+      state.fallingObjects.splice(index, 1);
+      
+      }
+  });
+
+  // Update particles
+  state.particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.1; // gravity
+    p.life -= 0.018;
+    p.vx *= 0.99;
+  });
+  state.particles = state.particles.filter(p => p.life > 0);
+}
+
+function draw(){
+  ctx.save();
+  
+  // Screen shake
+  if(state.screenShake > 0){
+    const s = state.screenShake;
+    ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s);
+  }
+  
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw particles behind everything
+  state.particles.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life * 0.8);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+  });
+  ctx.globalAlpha = 1;
+
+  // Draw falling objects with trails
+  state.fallingObjects.forEach(obj => {
+    // Draw trail
+    obj.trail.forEach((t, i) => {
+      ctx.globalAlpha = t.life * 0.4;
+      ctx.fillStyle = obj.color;
+      const size = t.size * t.life * 0.8;
+      ctx.fillRect(t.x - size/2, t.y - size/2, size, size);
+    });
+    
+    // Draw main object
+    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.translate(obj.x, obj.y + Math.sin(obj.wobble) * 2);
+    ctx.rotate(obj.rotation);
+    ctx.fillStyle = obj.color;
+    ctx.fillRect(-obj.size/2, -obj.size/2, obj.size, obj.size);
+    
+    // Draw border
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-obj.size/2, -obj.size/2, obj.size, obj.size);
+    ctx.restore();
+  });
+
+  // Draw paddle
+  ctx.fillStyle = state.paddle.color;
+  ctx.fillRect(state.paddle.x, state.paddle.y, state.paddle.w, state.paddle.h);
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(state.paddle.x, state.paddle.y, state.paddle.w, state.paddle.h);
+
+  // Draw combo indicator
+  if(state.comboCount > 1 && state.comboTimer > 0) {
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 16px system-ui';
+    ctx.textAlign = 'center';
+    const alpha = Math.min(1, state.comboTimer / 500);
+    ctx.globalAlpha = alpha;
+    ctx.fillText(`COMBO x${state.comboCount}`, W/2, 50);
+    ctx.globalAlpha = 1;
+  }
+
+  // Draw difficulty level
+  if(state.running && state.difficulty > 1) {
+    ctx.fillStyle = '#666';
+    ctx.font = '12px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText('Speed Level ' + state.difficulty, W - 20, H - 20);
+  }
+
+  ctx.restore();
+}
+
+let last = performance.now();
+function loop(t){
+  const dt = t - last;
+  last = t;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+center.innerHTML = '<div style="font-weight:700;font-size:20px">Color Catch</div><div style="opacity:0.8;margin-top:8px">Catch matching colors with your paddle!</div><div style="opacity:0.6;margin-top:6px">Press Space to start</div>';
+reset();
+requestAnimationFrame(loop);
+</script>
+
+</body></html>
