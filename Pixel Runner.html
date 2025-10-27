@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pixel Runner</title>
+<style>
+  :root{
+    --bg:#fff; --fg:#000; --muted:#666;
+    --accent1:#ffd6d6; --accent2:#ffe6b3; --accent3:#d6ffd6;
+    --accent4:#d6e6ff; --accent5:#f2d6ff; --accent6:#fff0b3;
+  }
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    display:grid;place-items:center;
+  }
+  #wrap{position:relative;width:360px;max-width:92vw;}
+  canvas{
+    width:100%;height:auto;display:block;
+    background:var(--bg);border:2px solid var(--fg);
+    border-radius:12px;image-rendering:pixelated;
+    box-shadow:0 8px 28px rgba(0,0,0,0.08);
+  }
+  .hud{position:absolute;left:12px;top:10px;font-size:14px;}
+  .best{position:absolute;right:12px;top:10px;font-size:14px;}
+  .hint{position:absolute;bottom:8px;left:10px;font-size:12px;color:var(--muted);}
+  .overlay{
+    position:absolute;inset:0;display:grid;place-items:center;
+    text-align:center;font:20px monospace;color:var(--fg);
+    opacity:0;transform:scale(.98);transition:opacity .2s ease,transform .2s ease;
+  }
+  .overlay.show{opacity:1;transform:scale(1);pointer-events:auto;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="hud">Score: <span id="score">0</span></div>
+  <div class="best">Best: <span id="best">0</span></div>
+  <canvas id="game" width="520" height="320"></canvas>
+  <div class="hint">Tap / Click / Space to jump</div>
+  <div class="overlay" id="overlay"></div>
+</div>
+<script>
+const c=document.getElementById('game'),ctx=c.getContext('2d');
+const W=c.width,H=c.height,GROUND_Y=H-40,PLAYER=20;
+const COLORS=['#ffd6d6','#ffe6b3','#d6ffd6','#d6e6ff','#f2d6ff','#fff0b3'];
+let player={x:60,y:GROUND_Y-PLAYER,vy:0,grounded:true};
+let obs=[],powerups=[],run=false,over=false,score=0,best=+localStorage.getItem('pixel_runnder_best')||0;
+let last=performance.now(),spd=3.0,timer=0;
+let actx=null;function audio(){if(!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}}
+function tone(f,d=0.1,t='square',g=0.05){if(!actx)return;const o=actx.createOscillator(),n=actx.createGain();o.type=t;o.frequency.value=f;n.gain.value=g;o.connect(n).connect(actx.destination);o.start();n.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+d);o.stop(actx.currentTime+d);}
+function jump(){tone(480,0.08,'triangle',0.06);}function land(){tone(200,0.08,'sawtooth',0.06);}function fail(){tone(140,0.3,'sawtooth',0.08);}function ping(){tone(880,0.05,'square',0.06);}
+let shield=false,shieldTimer=0,deathAnim=0;
+function reset(){obs=[];powerups=[];player.y=GROUND_Y-PLAYER;player.vy=0;player.grounded=true;score=0;spd=3.0;timer=0;over=false;run=false;shield=false;deathAnim=0;
+overlay.innerHTML='Pixel Runner<br><small>Tap / Click / Space to jump</small>';overlay.classList.add('show');draw();}
+function start(){audio();if(!run){run=true;overlay.classList.remove('show');last=performance.now();requestAnimationFrame(loop);}}
+function end(){run=false;over=true;fail();deathAnim=1.0;overlay.innerHTML=`GAME OVER<br>Score: ${Math.floor(score)}<br><small>Press R / Tap to restart</small>`;overlay.classList.add('show');if(score>best){best=Math.floor(score);localStorage.setItem('pixel_runnder_best',best);document.getElementById('best').textContent=best;}requestAnimationFrame(deathLoop);}
+window.addEventListener('keydown',e=>{if(e.code==='Space'){if(over){reset();start();}else{jumpPress();}}if(e.key==='r'||e.key==='R')if(over){reset();start();}});
+c.addEventListener('pointerdown',jumpPress);
+function jumpPress(){audio();if(!run){start();return;}if(over){reset();start();return;}if(player.grounded){player.vy=-8.4;player.grounded=false;jump();}}
+function spawnObstacle(){const w=Math.random()*30+16,h=Math.random()*20+16,col=COLORS[Math.floor(Math.random()*COLORS.length)];obs.push({x:W+w+6,y:GROUND_Y-h,w,h,col});}
+function spawnPowerup(){if(Math.random()<0.0015){const size=16;powerups.push({x:W+20,y:GROUND_Y-60+Math.random()*30,size,vy:Math.random()*0.3+0.1});}}
+function update(dt){dt=Math.min(dt,48);const f=dt/16;spd+=0.00045*dt;timer+=dt;if(timer>1000){timer=0;spawnObstacle();}
+for(let o of obs)o.x-=spd*f;obs=obs.filter(o=>o.x+o.w>-40);
+for(let p of powerups){p.x-=spd*f;p.y+=Math.sin(performance.now()/400)*0.3;}
+powerups=powerups.filter(p=>p.x>-40);
+player.vy+=0.36*f;player.y+=player.vy*f;if(player.y>GROUND_Y-PLAYER){player.y=GROUND_Y-PLAYER;player.vy=0;player.grounded=true;}
+for(let p of powerups){if(player.x<p.x+p.size&&player.x+PLAYER>p.x&&player.y<p.y+p.size&&player.y+PLAYER>p.y){shield=true;shieldTimer=4000;ping();powerups.splice(powerups.indexOf(p),1);}}
+if(shieldTimer>0){shieldTimer-=dt;if(shieldTimer<=0)shield=false;}
+for(let o of obs){if(player.x<o.x+o.w&&player.x+PLAYER>o.x&&player.y<o.y+o.h&&player.y+PLAYER>o.y){if(!shield){end();return;}}}
+score+=spd*f;document.getElementById('score').textContent=Math.floor(score);spawnPowerup();}
+function drawShieldIcon(p){ctx.fillStyle='#99f';ctx.beginPath();ctx.moveTo(p.x+p.size/2,p.y);ctx.lineTo(p.x+p.size,p.y+p.size*0.3);ctx.lineTo(p.x+p.size*0.8,p.y+p.size*0.9);ctx.lineTo(p.x+p.size/2,p.y+p.size);ctx.lineTo(p.x+p.size*0.2,p.y+p.size*0.9);ctx.lineTo(p.x,p.y+p.size*0.3);ctx.closePath();ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.stroke();}
+function draw(){ctx.clearRect(0,0,W,H);
+if(deathAnim>0){ctx.fillStyle='#ff4c4c';ctx.fillRect(0,0,W,H);return;}
+ctx.fillStyle='#000';ctx.fillRect(0,GROUND_Y,W,4);
+for(let o of obs){ctx.fillStyle=o.col;ctx.fillRect(o.x,o.y,o.w,o.h);ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.strokeRect(o.x+1,o.y+1,o.w-2,o.h-2);}
+for(let p of powerups){drawShieldIcon(p);}
+ctx.fillStyle='#000';ctx.fillRect(player.x,player.y,PLAYER,PLAYER);
+if(shield){let pulse=Math.sin(performance.now()/150)*4+PLAYER;ctx.strokeStyle='#66f';ctx.lineWidth=3;ctx.beginPath();ctx.arc(player.x+PLAYER/2,player.y+PLAYER/2,pulse,0,Math.PI*2);ctx.stroke();}}
+function loop(t){const dt=t-last;last=t;if(run&&!over){update(dt);draw();requestAnimationFrame(loop);}else{draw();}}
+function deathLoop(){if(deathAnim>0){draw();requestAnimationFrame(deathLoop);}}
+reset();
+document.getElementById('best').textContent=best;
+</script>
+</body>
+</html>
