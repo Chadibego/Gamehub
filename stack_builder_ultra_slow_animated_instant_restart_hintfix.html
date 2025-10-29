@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Stack Builder — Ultra Slow Pastel (Smooth Animations, Instant Restart)</title>
+<title>Stack Builder – Ultra Slow Pastel</title>
 <style>
   :root{ --bg:#fff; --fg:#000; --danger:#ff4c4c; }
   html,body{height:100%}
@@ -17,11 +17,15 @@
   .hud{ position:absolute; top:10px; left:12px; font-size:14px; z-index:3 }
   .hint{ position:absolute; bottom:6px; left:6px; font-size:12px; opacity:.8; z-index:3 }
   .overlay{
-    position:absolute; inset:0; display:grid; place-items:center; text-align:center; z-index:4;
-    font-size:26px; color:#000; pointer-events:none; opacity:0; transform:scale(.96);
-    transition:opacity .3s ease, transform .3s ease;
+    position:fixed; inset:0; display:grid; place-items:center; text-align:center;
+    font-size:24px; color:var(--fg); pointer-events:none; z-index:4;
+    opacity:0; transform:scale(0.95); transition:opacity .3s ease, transform .3s ease;
+    background:rgba(255,255,255,0.95);
+    backdrop-filter:blur(4px);
   }
   .overlay.show{ opacity:1; transform:scale(1); }
+  .overlay>div{animation:slideUp 0.5s ease;}
+  @keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
   .redcover{ position:absolute; inset:0; background:var(--danger); z-index:2; opacity:0; pointer-events:none; transition:opacity .35s ease; }
   .scan{ position:absolute; inset:0; pointer-events:none; z-index:2;
          background:repeating-linear-gradient(to bottom, rgba(0,0,0,.06) 0 2px, transparent 2px 4px); mix-blend-mode:multiply; }
@@ -31,10 +35,16 @@
   <div id="wrap">
     <div class="hud">Score: <span id="score">0</span></div>
     <div class="hint">Space/Click to drop • R to restart</div>
-    <div id="overlay" class="overlay"></div>
     <div id="red" class="redcover"></div>
     <div class="scan"></div>
     <canvas id="c" width="360" height="640"></canvas>
+  </div>
+  <div id="overlay" class="overlay show">
+    <div>
+      <div style="font-weight:700;font-size:26px">Stack Builder</div>
+      <div style="opacity:0.8;margin-top:10px;font-size:16px">Stack blocks as high as you can</div>
+      <div style="opacity:0.7;margin-top:12px;font-size:14px">Press Space to start</div>
+    </div>
   </div>
 
 <script>
@@ -74,7 +84,7 @@ let score=0;
 let baseY = H-40;
 let shake=0;
 let pulse=0; // game-over pulse
-let firstPlay=true;
+let firstStart=true;
 
 const BLOCK_H = 20;
 const START_W = 140;
@@ -84,8 +94,15 @@ const PERFECT_TOL = 4;
 const colors = ["#ffd6d6","#ffe6b3","#d6ffd6","#d6e6ff","#f2d6ff","#fff0b3"];
 
 window.addEventListener('keydown',e=>{
-  if(e.code==="Space"){ e.preventDefault(); handleDrop(); }
-  if(e.key==="r"||e.key==="R"){ if(gameOver) start(); else reset(); }
+  if(e.code==="Space"){ 
+    e.preventDefault(); 
+    if(firstStart && !running){
+      start();
+    } else {
+      handleDrop();
+    }
+  }
+  if(e.key==="r"||e.key==="R"){ if(gameOver) start(); }
   ensureAudio();
 });
 canvas.addEventListener('pointerdown',()=>{ ensureAudio(); handleDrop(); });
@@ -95,22 +112,12 @@ function start(){
   overlay.classList.remove('show');
   stack=[];
   score=0; speed=0.05; direction=1; shake=0; pulse=0;
+  scoreEl.textContent='0';
   stack.push({x:(W-START_W)/2, y:baseY, w:START_W, h:BLOCK_H, settled:true, color:"#000", bounceStart:0, glow:0});
   spawnMover();
   draw();
   requestAnimationFrame(loop);
-  firstPlay=false;
-}
-
-function reset(){
-  running=false; gameOver=false;
-  if(firstPlay){
-    overlay.innerHTML = 'Click or press <b>Space</b> to start';
-    overlay.classList.add('show');
-  }else{
-    start(); // after first play, skip overlay
-  }
-  draw();
+  firstStart=false;
 }
 
 function spawnMover(){
@@ -122,6 +129,7 @@ function spawnMover(){
 }
 
 function handleDrop(){
+  if(firstStart && !running){ start(); return; }
   if(!running){ start(); return; }
   if(gameOver){ start(); return; }
   if(!mover) return;
@@ -134,10 +142,10 @@ function handleDrop(){
   if(overlap <= 0){
     sfx.fail();
     gameOver = true;
-    red.style.opacity=0.9; // softer than hard cut
-    overlay.innerHTML = `GAME OVER<br>Score: ${score}<br><small>Press R / Space / Click to restart</small>`;
+    red.style.opacity=0.9;
+    overlay.innerHTML = '<div><div style="font-weight:800;font-size:28px">GAME OVER</div><div style="margin-top:12px;font-size:18px">Score: '+score+'</div><div style="opacity:0.85;margin-top:16px;font-size:14px">Press R to restart</div></div>';
     overlay.classList.add('show');
-    pulse = 1; // trigger soft pulse
+    pulse = 1;
     return;
   }
 
@@ -155,8 +163,8 @@ function handleDrop(){
 
   mover.x = overlapLeft;
   mover.w = newW;
-  mover.bounceStart = performance.now(); // start bounce
-  mover.glow = perfect ? 1 : 0; // perfect glow
+  mover.bounceStart = performance.now();
+  mover.glow = perfect ? 1 : 0;
   stack.push(mover);
   mover = null;
 
@@ -169,12 +177,12 @@ function handleDrop(){
     stack.forEach(b => b.y += dy);
   }
 
-  speed = Math.min(0.5, speed + 0.005); // ultra slow ramp-up
+  speed = Math.min(0.5, speed + 0.005);
   if(stack[stack.length-1].w < 8){
     sfx.fail();
     gameOver=true;
     red.style.opacity=0.9;
-    overlay.innerHTML = `GAME OVER<br>Score: ${score}<br><small>Press R / Space / Click to restart</small>`;
+    overlay.innerHTML = '<div><div style="font-weight:800;font-size:28px">GAME OVER</div><div style="margin-top:12px;font-size:18px">Score: '+score+'</div><div style="opacity:0.85;margin-top:16px;font-size:14px">Press R to restart</div></div>';
     overlay.classList.add('show');
     pulse = 1;
     return;
@@ -189,7 +197,7 @@ function update(dt){
     if(direction<0 && mover.x <= 0) { direction=1; mover.x = 0; }
   }
   if(shake>0) shake -= dt;
-  if(pulse>0) pulse *= 0.9; // decay pulse
+  if(pulse>0) pulse *= 0.9;
   for(const b of stack){ if(b.glow>0) b.glow *= 0.9; }
 }
 
@@ -246,7 +254,7 @@ function loop(t){
   if(running && !gameOver) requestAnimationFrame(loop);
 }
 
-reset();
+draw();
 </script>
 </body>
 </html>
