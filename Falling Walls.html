@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Side Swipe — Falling Walls (Arcade Sound Edition)</title>
+<title>Side Swipe – Falling Walls</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
   :root{--bg:#fff;--fg:#000;--danger:#ff4c4c;}
@@ -12,12 +12,17 @@
        display:grid;place-items:center;overflow:hidden}
   canvas{background:var(--bg);display:block;position:relative;z-index:1}
   .hud{position:fixed;top:10px;left:10px;font:16px/1 monospace;z-index:2}
-  .right{position:fixed;top:10px;right:10px;font:16px/1 monospace;z-index:2}
   .hint{position:fixed;bottom:10px;left:10px;font:13px/1.2 monospace;z-index:2}
-  .overlay{position:fixed;inset:0;display:grid;place-items:center;text-align:center;
-           font:28px monospace;color:#000;pointer-events:none;opacity:0;transform:scale(.95);
-           transition:opacity .25s ease, transform .25s ease;z-index:3}
-  .overlay.show{opacity:1;transform:scale(1)}
+  .overlay{
+    position:fixed;inset:0;display:grid;place-items:center;text-align:center;
+    font-size:24px;color:var(--fg);pointer-events:none;z-index:3;
+    opacity:0;transform:scale(0.95);transition:opacity .3s ease,transform .3s ease;
+    background:rgba(255,255,255,0.95);
+    backdrop-filter:blur(4px);
+  }
+  .overlay.show{opacity:1;transform:scale(1);}
+  .overlay>div{animation:slideUp 0.5s ease;}
+  @keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
   .scanlines{position:absolute;top:0;left:0;width:100%;height:100%;z-index:2;
              background:repeating-linear-gradient(to bottom,rgba(0,0,0,0.08) 0,rgba(0,0,0,0.08) 2px,transparent 2px,transparent 4px);
              pointer-events:none;mix-blend-mode:multiply}
@@ -25,9 +30,14 @@
 </head>
 <body>
   <div class="hud">Score: <span id="score">0</span> • Best: <span id="best">0</span></div>
-  <div class="right">Press <b>Space</b> to start • Move with <b>A/D</b> or <b>←/→</b></div>
-  <div class="hint">Game Over → <b>Press any key</b> to restart</div>
-  <div class="overlay" id="overlay"></div>
+  <div class="hint">Move with A/D or ←/→ • R to restart</div>
+  <div class="overlay show" id="overlay">
+    <div>
+      <div style="font-weight:700;font-size:26px">Side Swipe</div>
+      <div style="opacity:0.8;margin-top:10px;font-size:16px">Navigate through the falling walls</div>
+      <div style="opacity:0.7;margin-top:12px;font-size:14px">Press Space to start</div>
+    </div>
+  </div>
   <div class="scanlines"></div>
   <canvas id="game" width="520" height="640"></canvas>
 
@@ -65,7 +75,7 @@ let spawnTimer = 0;
 let elapsed=0;
 
 // State
-let running=false, gameOver=false;
+let running=false, gameOver=false, firstStart=true;
 let last = performance.now();
 let score=0;
 let best = +localStorage.getItem('sideswipe_best')||0;
@@ -75,8 +85,22 @@ bestEl.textContent = best;
 let left=false, right=false;
 window.addEventListener('keydown', (e)=>{
   ensureAudio();
-  if(gameOver && !running){ start(); return; }
-  if(e.code==='Space'){ if(!running) start(); return; }
+  if(e.code==='Space'){
+    if(firstStart && !running){
+      start();
+    } else if(gameOver){
+      start();
+    } else if(!running){
+      start();
+    }
+    return;
+  }
+  if(e.key==='r'||e.key==='R'){
+    if(gameOver){
+      start();
+    }
+    return;
+  }
   if(e.key==='a'||e.key==='A'||e.key==='ArrowLeft') left=true;
   if(e.key==='d'||e.key==='D'||e.key==='ArrowRight') right=true;
 });
@@ -128,13 +152,11 @@ function soundWhoosh(){
 }
 
 function soundPing(){
-  // retro arcade "coin" effect: quick arpeggio
   playBeep(880,0.08,"square",0.07);
   setTimeout(()=>playBeep(1320,0.08,"square",0.07),60);
 }
 
 function soundThud(){
-  // low descending sweep
   if(!audioCtx) return;
   const o=audioCtx.createOscillator();
   const g=audioCtx.createGain();
@@ -149,9 +171,9 @@ function soundThud(){
 }
 
 function start(){
-  running=true; gameOver=false;
+  running=true; gameOver=false; firstStart=false;
   walls=[]; wallSpeed=2.2; gapWidth=190; spawnEvery=900;
-  spawnTimer=0; elapsed=0;
+  spawnTimer=0; elapsed=0; popups=[];
   px = playX + playW/2 - P_SIZE/2;
   vx = 0;
   score=0; updateHUD();
@@ -162,7 +184,7 @@ function start(){
 
 function endGame(){
   running=false; gameOver=true;
-  overlay.innerHTML = `GAME OVER<br>Score: ${score}<br><small>Press any key to restart</small>`;
+  overlay.innerHTML = '<div><div style="font-weight:800;font-size:28px">GAME OVER</div><div style="margin-top:12px;font-size:18px">Score: '+score+'</div><div style="margin-top:4px;font-size:16px">Best: '+best+'</div><div style="opacity:0.85;margin-top:16px;font-size:14px">Press R to restart</div></div>';
   overlay.classList.add('show');
   if(score>best){ best=score; localStorage.setItem('sideswipe_best',best); }
   bestEl.textContent = best;
@@ -277,8 +299,6 @@ function loop(t){
   requestAnimationFrame(loop);
 }
 
-overlay.innerHTML='Press <b>Space</b> to start';
-overlay.classList.add('show');
 draw();
 </script>
 </body>
