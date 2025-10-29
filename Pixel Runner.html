@@ -27,11 +27,15 @@
   .best{position:absolute;right:12px;top:10px;font-size:14px;}
   .hint{position:absolute;bottom:8px;left:10px;font-size:12px;color:var(--muted);}
   .overlay{
-    position:absolute;inset:0;display:grid;place-items:center;
-    text-align:center;font:20px monospace;color:var(--fg);
-    opacity:0;transform:scale(.98);transition:opacity .2s ease,transform .2s ease;
+    position:fixed;inset:0;display:grid;place-items:center;text-align:center;
+    font-size:24px;color:var(--fg);pointer-events:none;z-index:3;
+    opacity:0;transform:scale(0.95);transition:opacity .3s ease,transform .3s ease;
+    background:rgba(255,255,255,0.95);
+    backdrop-filter:blur(4px);
   }
-  .overlay.show{opacity:1;transform:scale(1);pointer-events:auto;}
+  .overlay.show{opacity:1;transform:scale(1);}
+  .overlay>div{animation:slideUp 0.5s ease;}
+  @keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
 </style>
 </head>
 <body>
@@ -40,7 +44,13 @@
   <div class="best">Best: <span id="best">0</span></div>
   <canvas id="game" width="520" height="320"></canvas>
   <div class="hint">Tap / Click / Space to jump</div>
-  <div class="overlay" id="overlay"></div>
+</div>
+<div class="overlay show" id="overlay">
+  <div>
+    <div style="font-weight:700;font-size:26px">Pixel Runner</div>
+    <div style="opacity:0.8;margin-top:10px;font-size:16px">Jump over obstacles and survive</div>
+    <div style="opacity:0.7;margin-top:12px;font-size:14px">Press Space to start</div>
+  </div>
 </div>
 <script>
 const c=document.getElementById('game'),ctx=c.getContext('2d');
@@ -52,14 +62,26 @@ let last=performance.now(),spd=3.0,timer=0;
 let actx=null;function audio(){if(!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}}
 function tone(f,d=0.1,t='square',g=0.05){if(!actx)return;const o=actx.createOscillator(),n=actx.createGain();o.type=t;o.frequency.value=f;n.gain.value=g;o.connect(n).connect(actx.destination);o.start();n.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+d);o.stop(actx.currentTime+d);}
 function jump(){tone(480,0.08,'triangle',0.06);}function land(){tone(200,0.08,'sawtooth',0.06);}function fail(){tone(140,0.3,'sawtooth',0.08);}function ping(){tone(880,0.05,'square',0.06);}
-let shield=false,shieldTimer=0,deathAnim=0;
+let shield=false,shieldTimer=0,deathAnim=0,firstStart=true;
 function reset(){obs=[];powerups=[];player.y=GROUND_Y-PLAYER;player.vy=0;player.grounded=true;score=0;spd=3.0;timer=0;over=false;run=false;shield=false;deathAnim=0;
-overlay.innerHTML='Pixel Runner<br><small>Tap / Click / Space to jump</small>';overlay.classList.add('show');draw();}
-function start(){audio();if(!run){run=true;overlay.classList.remove('show');last=performance.now();requestAnimationFrame(loop);}}
-function end(){run=false;over=true;fail();deathAnim=1.0;overlay.innerHTML=`GAME OVER<br>Score: ${Math.floor(score)}<br><small>Press R / Tap to restart</small>`;overlay.classList.add('show');if(score>best){best=Math.floor(score);localStorage.setItem('pixel_runnder_best',best);document.getElementById('best').textContent=best;}requestAnimationFrame(deathLoop);}
-window.addEventListener('keydown',e=>{if(e.code==='Space'){if(over){reset();start();}else{jumpPress();}}if(e.key==='r'||e.key==='R')if(over){reset();start();}});
+document.getElementById('score').textContent='0';
+draw();}
+function start(){audio();if(!run){run=true;firstStart=false;overlay.classList.remove('show');last=performance.now();requestAnimationFrame(loop);}}
+function end(){run=false;over=true;fail();deathAnim=1.0;
+overlay.innerHTML='<div><div style="font-weight:800;font-size:28px">GAME OVER</div><div style="margin-top:12px;font-size:18px">Score: '+Math.floor(score)+'</div><div style="margin-top:4px;font-size:16px">Best: '+best+'</div><div style="opacity:0.85;margin-top:16px;font-size:14px">Press R to restart</div></div>';
+overlay.classList.add('show');
+if(score>best){best=Math.floor(score);localStorage.setItem('pixel_runnder_best',best);document.getElementById('best').textContent=best;}
+requestAnimationFrame(deathLoop);}
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'){
+    if(firstStart && !run){start();}
+    else if(over){reset();start();}
+    else{jumpPress();}
+  }
+  if(e.key==='r'||e.key==='R')if(over){reset();start();}
+});
 c.addEventListener('pointerdown',jumpPress);
-function jumpPress(){audio();if(!run){start();return;}if(over){reset();start();return;}if(player.grounded){player.vy=-8.4;player.grounded=false;jump();}}
+function jumpPress(){audio();if(firstStart && !run){start();return;}if(!run){start();return;}if(over){reset();start();return;}if(player.grounded){player.vy=-8.4;player.grounded=false;jump();}}
 function spawnObstacle(){const w=Math.random()*30+16,h=Math.random()*20+16,col=COLORS[Math.floor(Math.random()*COLORS.length)];obs.push({x:W+w+6,y:GROUND_Y-h,w,h,col});}
 function spawnPowerup(){if(Math.random()<0.0015){const size=16;powerups.push({x:W+20,y:GROUND_Y-60+Math.random()*30,size,vy:Math.random()*0.3+0.1});}}
 function update(dt){dt=Math.min(dt,48);const f=dt/16;spd+=0.00045*dt;timer+=dt;if(timer>1000){timer=0;spawnObstacle();}
