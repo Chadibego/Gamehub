@@ -3,16 +3,24 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Paddle Smash — Black & White Arcade</title>
+<title>Paddle Smash – Black & White Arcade</title>
 <style>
   :root{--bg:#fff;--fg:#000}
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:ui-monospace,Menlo,Consolas,monospace}
   .wrap{height:100%;display:flex;align-items:center;justify-content:center}
   canvas{background:var(--bg);border:4px solid var(--fg);box-shadow:0 12px 30px rgba(0,0,0,0.08);display:block}
   #hud{position:fixed;left:18px;top:16px;font-weight:400}
   #hint{position:fixed;right:18px;top:14px;font-size:13px;opacity:0.75}
-  #center{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center}
-  .btn{display:inline-block;margin-top:12px;padding:8px 12px;border:2px solid var(--fg);cursor:pointer}
+  .overlay{
+    position:fixed;inset:0;display:grid;place-items:center;text-align:center;
+    font-size:24px;color:var(--fg);pointer-events:none;z-index:3;
+    opacity:0;transform:scale(0.95);transition:opacity .3s ease,transform .3s ease;
+    background:rgba(255,255,255,0.95);
+    backdrop-filter:blur(4px);
+  }
+  .overlay.show{opacity:1;transform:scale(1);}
+  .overlay>div{animation:slideUp 0.5s ease;}
+  @keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
   @media (max-width:600px){canvas{width:360px;height:600px}}
 </style>
 </head>
@@ -22,15 +30,21 @@
   <div class="wrap">
     <canvas id="c" width="420" height="600" aria-label="Paddle Smash black and white arcade"></canvas>
   </div>
-  <div id="center"></div>
+  <div class="overlay show" id="overlay">
+    <div>
+      <div style="font-weight:700;font-size:26px">Paddle Smash</div>
+      <div style="opacity:0.8;margin-top:10px;font-size:16px">Keep the ball in play</div>
+      <div style="opacity:0.7;margin-top:12px;font-size:14px">Press Space to start</div>
+    </div>
+  </div>
 <script>
-// Paddle Smash — black & white arcade
+// Paddle Smash – black & white arcade
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
-const center = document.getElementById('center');
+const overlay = document.getElementById('overlay');
 
 // Pastel colors for ball
 const pastelColors = ['#FFB6C1', '#E6E6FA', '#98FB98', '#F0E68C', '#FFA07A', '#87CEEB', '#DDA0DD', '#F5DEB3', '#90EE90', '#FFE4E1'];
@@ -56,6 +70,8 @@ let state = {
   score: 0,
   best: +localStorage.getItem('paddle_smash_bw_best') || 0,
   running: false,
+  gameStarted: false,
+  firstStart: true,
   gameOver: false,
   screenShake: 0,
   highScoreFlash: false,
@@ -67,25 +83,44 @@ bestEl.textContent = state.best;
 // input
 const keys = {};
 window.addEventListener('keydown', e=>{ 
-  keys[e.key]=true; 
-  if(!state.running && !state.gameOver) serve(); 
+  keys[e.key]=true;
+  
+  // Start game on space (only on first start)
+  if(e.code === 'Space' && state.firstStart && !state.gameStarted) {
+    serve();
+    return;
+  }
+  
+  if(state.gameStarted && !state.running && !state.gameOver) serve(); 
   if(e.key==='r'||e.key==='R'){reset();}
 });
 window.addEventListener('keyup', e=> keys[e.key]=false);
 
-function serve(){ if(!state.running) { state.running = true; center.innerHTML=''; }
-  if(state.ball.stuck){ state.ball.stuck=false; state.ball.vx = (Math.random()*2-1)*2; state.ball.vy = -state.ball.speed; sfx(880,0.08,'square',0.08,0.5); }}
+function serve(){ 
+  if(!state.running) { 
+    state.running = true; 
+    state.gameStarted = true;
+    state.firstStart = false;
+    overlay.classList.remove('show');
+  }
+  if(state.ball.stuck){ 
+    state.ball.stuck=false; 
+    state.ball.vx = (Math.random()*2-1)*2; 
+    state.ball.vy = -state.ball.speed; 
+    sfx(880,0.08,'square',0.08,0.5); 
+  }
+}
 
 function reset(){ 
   state.paddle.x = (W-state.paddle.w)/2; 
-  state.paddle.w = 100; // reset paddle size
+  state.paddle.w = 100;
   state.ball.x = W/2; 
   state.ball.y = state.paddle.y - 20; 
   state.ball.vx = 0; 
   state.ball.vy = 0; 
   state.ball.stuck = true; 
   state.ball.color = pastelColors[Math.floor(Math.random()*pastelColors.length)]; 
-  state.ball.speed = 6; // reset ball speed
+  state.ball.speed = 6;
   state.score = 0; 
   state.running = false; 
   state.gameOver = false; 
@@ -94,7 +129,7 @@ function reset(){
   state.highScoreTimer = 0;
   state.difficultyLevel = 1;
   scoreEl.textContent = '0'; 
-  center.innerHTML = '<div style="font-weight:700;font-size:20px">Paddle Smash</div><div style="opacity:0.8;margin-top:8px">Move or press any key to start</div>'; 
+  // Don't show overlay on restart, only on game over
 }
 
 function hitPaddle(){
@@ -118,9 +153,30 @@ function hitPaddle(){
   }
 }
 
-function spawnParticles(x,y,count=12){ for(let i=0;i<count;i++){ state.particles.push({x,y,vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:1, size:2+Math.random()*3}); } }
+function spawnParticles(x,y,count=12){ 
+  for(let i=0;i<count;i++){ 
+    state.particles.push({
+      x,y,
+      vx:(Math.random()-0.5)*6, 
+      vy:(Math.random()-0.5)*6, 
+      life:1, 
+      size:2+Math.random()*3
+    }); 
+  } 
+}
 
-function update(dt){ if(state.gameOver) { state.screenShake = Math.max(0, state.screenShake-0.6); state.particles.forEach(p=>{ p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 0.02; }); state.particles = state.particles.filter(p=>p.life>0); return; }
+function update(dt){ 
+  if(state.gameOver) { 
+    state.screenShake = Math.max(0, state.screenShake-0.6); 
+    state.particles.forEach(p=>{ 
+      p.x += p.vx; 
+      p.y += p.vy; 
+      p.vy += 0.12; 
+      p.life -= 0.02; 
+    }); 
+    state.particles = state.particles.filter(p=>p.life>0); 
+    return; 
+  }
 
   if((keys['ArrowLeft']||keys['a']||keys['A']) ) state.paddle.x = Math.max(0, state.paddle.x - state.paddle.speed);
   if((keys['ArrowRight']||keys['d']||keys['D']) ) state.paddle.x = Math.min(W-state.paddle.w, state.paddle.x + state.paddle.speed);
@@ -134,9 +190,12 @@ function update(dt){ if(state.gameOver) { state.screenShake = Math.max(0, state.
   }
 
   const b = state.ball;
-  if(b.stuck){ b.x = state.paddle.x + state.paddle.w/2; b.y = state.paddle.y - b.r - 2; }
-  else {
-    b.x += b.vx; b.y += b.vy; 
+  if(b.stuck){ 
+    b.x = state.paddle.x + state.paddle.w/2; 
+    b.y = state.paddle.y - b.r - 2; 
+  } else {
+    b.x += b.vx; 
+    b.y += b.vy; 
     
     // Gravity increases slightly with difficulty
     const gravity = 0.12 + (state.difficultyLevel * 0.005);
@@ -153,7 +212,8 @@ function update(dt){ if(state.gameOver) { state.screenShake = Math.max(0, state.
   if(b.y - b.r < 0){ b.y = b.r; b.vy = -b.vy; sfx(720,0.06,'square',0.07,0.8); }
 
   if(b.y + b.r > state.paddle.y && b.y + b.r < state.paddle.y + state.paddle.h && b.x > state.paddle.x && b.x < state.paddle.x + state.paddle.w && b.vy > 0){
-    hitPaddle(); sfx(1200,0.07,'square',0.08,0.7);
+    hitPaddle(); 
+    sfx(1200,0.07,'square',0.08,0.7);
     state.score += 1; 
     scoreEl.textContent = state.score;
     if(state.score > state.best){ 
@@ -162,27 +222,47 @@ function update(dt){ if(state.gameOver) { state.screenShake = Math.max(0, state.
       localStorage.setItem('paddle_smash_bw_best', state.best); 
       // Trigger high score flash and sound
       state.highScoreFlash = true;
-      state.highScoreTimer = 3500; // 3.5 seconds
-      sfx(1800, 0.2, 'triangle', 0.12); // Arcade sound for new high score
+      state.highScoreTimer = 3500;
+      sfx(1800, 0.2, 'triangle', 0.12);
     }
   }
 
   if(b.y - b.r > H){
-    state.gameOver = true; state.running = false; state.screenShake = 18; spawnParticles(b.x, b.y, 30); sfx(160,0.4,'sawtooth',0.09,2);
-    center.innerHTML = '<div style="font-weight:800;font-size:28px">Game Over</div>' +
-      '<div style="margin-top:6px;font-size:18px">Score: '+state.score+'</div>' +
+    state.gameOver = true; 
+    state.running = false; 
+    state.screenShake = 18; 
+    spawnParticles(b.x, b.y, 30); 
+    sfx(160,0.4,'sawtooth',0.09,2);
+    overlay.innerHTML = '<div><div style="font-weight:800;font-size:28px">GAME OVER</div>' +
+      '<div style="margin-top:12px;font-size:18px">Score: '+state.score+'</div>' +
       '<div style="margin-top:4px;font-size:16px">Best: '+state.best+'</div>' +
-      '<div style="opacity:0.85;margin-top:10px">Press R to restart</div>';
+      '<div style="opacity:0.85;margin-top:16px;font-size:14px">Press R to restart</div></div>';
+    overlay.classList.add('show');
   }
 
-  state.particles.forEach(p=>{ p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life -= 0.02; p.size *= 0.98; });
+  state.particles.forEach(p=>{ 
+    p.x += p.vx; 
+    p.y += p.vy; 
+    p.vy += 0.08; 
+    p.life -= 0.02; 
+    p.size *= 0.98; 
+  });
   state.particles = state.particles.filter(p=>p.life>0 && p.size>0.5);
 }
 
-function draw(){ ctx.save(); if(state.screenShake>0){ const s = state.screenShake; ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s); }
+function draw(){ 
+  ctx.save(); 
+  if(state.screenShake>0){ 
+    const s = state.screenShake; 
+    ctx.translate((Math.random()-0.5)*s, (Math.random()-0.5)*s); 
+  }
   ctx.clearRect(0,0,W,H);
 
-  state.particles.forEach(p=>{ ctx.globalAlpha = Math.max(0,p.life); ctx.fillStyle='#000'; ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); });
+  state.particles.forEach(p=>{ 
+    ctx.globalAlpha = Math.max(0,p.life); 
+    ctx.fillStyle='#000'; 
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size); 
+  });
 
   const p = state.paddle;
   ctx.globalAlpha = 1;
@@ -213,9 +293,9 @@ function draw(){ ctx.save(); if(state.screenShake>0){ const s = state.screenShak
 
   // Draw high score flash message
   if(state.highScoreFlash && state.highScoreTimer > 0) {
-    const flashAlpha = Math.sin(Date.now() * 0.01) * 0.3 + 0.7; // Pulsing effect
+    const flashAlpha = Math.sin(Date.now() * 0.01) * 0.3 + 0.7;
     ctx.globalAlpha = flashAlpha;
-    ctx.fillStyle = '#FFD700'; // Gold color
+    ctx.fillStyle = '#FFD700';
     ctx.font = 'bold 16px system-ui';
     ctx.textAlign = 'center';
     ctx.fillText('NEW HIGH SCORE!', W/2, 50);
@@ -226,10 +306,15 @@ function draw(){ ctx.save(); if(state.screenShake>0){ const s = state.screenShak
 }
 
 let last = performance.now();
-function loop(t){ const dt = t - last; last = t; update(dt); draw(); requestAnimationFrame(loop); }
+function loop(t){ 
+  const dt = t - last; 
+  last = t; 
+  update(dt); 
+  draw(); 
+  requestAnimationFrame(loop); 
+}
 
-center.innerHTML = '<div style="font-weight:700;font-size:20px">Paddle Smash</div><div style="opacity:0.8;margin-top:8px">Move or press any key to start</div>';
-reset(); requestAnimationFrame(loop);
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
