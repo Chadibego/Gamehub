@@ -3,151 +3,416 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Memory Flip – Emoji Arcade v1</title>
+<title>Memory Flip – Arcade</title>
 <style>
   :root{
-    --bg:#fff; --fg:#000; --accent:#000; --danger:#ff4c4c; --win:#00c853;
+    --bg:#fff; --fg:#000; --danger:#ff4c4c; --win:#00c853;
   }
   html,body{height:100%}
   body{
     margin:0; background:var(--bg); color:var(--fg);
-    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
     display:grid; place-items:center; overflow:hidden;
   }
-  #wrap{ position:relative; width: min(100vw, 960px); height: min(100vh, 620px); }
+  #wrap{ 
+    position:relative; 
+    width: 420px; 
+    height: 600px;
+    border: 4px solid var(--fg);
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+    background: var(--bg);
+  }
   .hud{
-    position:absolute; left:16px; top:12px; z-index:4; font-weight:600; letter-spacing:.4px;
+    position:absolute; left:18px; top:16px; z-index:4; font-weight:700; font-size:14px;
+  }
+  .hint{
+    position:absolute; right:18px; bottom:14px; font-size:13px; opacity:0.75; z-index:5;
   }
   .timerbar{
-    position:absolute; left:0; right:0; top:0; height:8px; background:#ddd; overflow:hidden;
+    position:absolute; left:0; right:0; top:0; height:6px; background:#ddd; overflow:hidden;
+    border-radius: 12px 12px 0 0;
   }
   .timerbar>span{
     display:block; height:100%; width:100%; background:var(--fg); transform-origin:left center; transform:scaleX(1);
     transition:transform .25s linear, background .2s ease;
   }
   .board{
-    position:absolute; inset:48px 16px 16px 16px; display:grid; gap:10px; align-content:center; justify-items:center;
+    position:absolute; inset:48px 16px 40px 16px; display:grid; gap:8px; align-content:center; justify-items:center;
   }
   .card{
     position:relative; width:100%; height:100%; perspective:800px; cursor:pointer;
   }
   .card-inner{
-    width:100%; height:100%; position:absolute; transform-style:preserve-3d; transition:transform .28s ease;
+    width:100%; height:100%; position:absolute; transform-style:preserve-3d; transition:transform .25s ease;
   }
-  .card.flipped .card-inner{ transform: rotateY(180deg) scale(1.02); }
+  .card.flipped .card-inner{ transform: rotateY(180deg); }
   .card-face{
     position:absolute; inset:0; backface-visibility:hidden; border:2px solid var(--fg);
-    border-radius:16px; display:grid; place-items:center; user-select:none;
+    border-radius:12px; display:grid; place-items:center; user-select:none;
   }
   .front{ background:var(--fg); color:var(--bg); font-weight:700; }
-  .back{ background:var(--bg); color:var(--fg); transform:rotateY(180deg); font-size: clamp(28px, 6.2vmin, 48px); }
-  .matched .back{ box-shadow:0 0 0 3px var(--win) inset, 0 0 18px rgba(0,0,0,.15); animation:pulse .5s ease; }
-  @keyframes pulse{ 0%{transform:rotateY(180deg) scale(1)} 50%{transform:rotateY(180deg) scale(1.06)} 100%{transform:rotateY(180deg) scale(1)} }
-  .shake{ animation:shake .28s ease; }
-  @keyframes shake{ 0%,100%{ transform:translateX(0) } 25%{ transform:translateX(-6px) } 75%{ transform:translateX(6px) } }
-  .menu, .overlay{
-    position:absolute; inset:0; display:grid; place-items:center; text-align:center; z-index:6;
+  .back{ background:var(--bg); color:var(--fg); transform:rotateY(180deg); font-size: clamp(20px, 5vmin, 36px); }
+  .matched .back{ 
+    box-shadow:0 0 0 3px var(--win) inset; 
+    animation:matchPulse .4s ease;
   }
-  .menu-inner{
-    display:grid; gap:14px; padding:24px; border:2px solid var(--fg); border-radius:20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+  @keyframes matchPulse{ 
+    0%{transform:rotateY(180deg) scale(1)} 
+    50%{transform:rotateY(180deg) scale(1.08)} 
+    100%{transform:rotateY(180deg) scale(1)} 
   }
-  .title{ font-size:28px; font-weight:800; letter-spacing:.5px; }
-  .buttons{ display:grid; grid-template-columns:1fr; gap:10px; }
+  .shake{ animation:shake .25s ease; }
+  @keyframes shake{ 
+    0%,100%{ transform:translateX(0) } 
+    25%{ transform:translateX(-4px) } 
+    75%{ transform:translateX(4px) } 
+  }
+  .overlay{
+    position:fixed; inset:0; display:grid; place-items:center; text-align:center;
+    font-size:24px; color:var(--fg); pointer-events:none; z-index:10;
+    opacity:0; transform:scale(0.95); transition:opacity .3s ease, transform .3s ease;
+    background:rgba(255,255,255,0.95);
+    backdrop-filter:blur(4px);
+  }
+  .overlay.show{ opacity:1; transform:scale(1); pointer-events:all; }
+  .overlay>div{ animation:slideUp 0.5s ease; }
+  @keyframes slideUp{ 
+    from{opacity:0; transform:translateY(20px);} 
+    to{opacity:1; transform:translateY(0);} 
+  }
+  .overlay-inner{
+    display:grid; gap:14px; padding:24px; border:3px solid var(--fg); border-radius:16px;
+    background: var(--bg);
+    box-shadow: 0 10px 30px rgba(0,0,0,.1);
+    max-width: 340px;
+  }
+  .title{ font-size:26px; font-weight:700; }
+  .buttons{ display:grid; gap:10px; }
   .btn{
-    padding:12px 18px; border:2px solid var(--fg); border-radius:14px; background:#fff; color:#000;
-    font-weight:700; cursor:pointer; transition:transform .08s ease, box-shadow .15s ease;
+    padding:14px 20px; border:2px solid var(--fg); border-radius:12px; background:var(--bg); color:var(--fg);
+    font-weight:700; cursor:pointer; transition:transform .15s ease, box-shadow .15s ease;
+    font-family: inherit; font-size: 14px;
   }
-  .btn:hover{ transform:translateY(-1px); box-shadow:0 6px 14px rgba(0,0,0,.1) }
-  .btn:active{ transform:translateY(1px) }
-  .overlay.backdrop{ background: rgba(0,0,0,.02); }
-  .overlay .panel{
-    padding:24px 28px; border:2px solid var(--fg); border-radius:18px; background:var(--bg);
-    text-align:center; min-width:280px;
+  .btn:hover{ transform:translateY(-2px); box-shadow:0 6px 14px rgba(0,0,0,.15); }
+  .btn:active{ transform:translateY(0); }
+  .subtitle{ opacity:.8; margin-top:6px; font-size:14px; }
+  .overlay.red{ background: var(--danger); }
+  .custom-timer{
+    display: grid;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 16px;
+    border: 2px solid var(--fg);
+    border-radius: 12px;
+    background: #f8f8f8;
   }
-  .overlay.red{ background: var(--danger); color:#000; }
-  .overlay .subtitle{ opacity:.8; margin-top:6px; font-size:14px }
-  .hint{ position:absolute; right:16px; bottom:12px; font-size:12px; opacity:.7; z-index:5 }
-  /* Responsive board sizing via CSS variables set from JS */
+  .custom-timer label{
+    font-size: 13px;
+    opacity: 0.8;
+    font-weight: 700;
+  }
+  .difficulty-select{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .difficulty-btn{
+    padding: 8px;
+    border: 2px solid var(--fg);
+    border-radius: 8px;
+    background: var(--bg);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    transition: all 0.2s ease;
+  }
+  .difficulty-btn:hover{
+    background: #f0f0f0;
+  }
+  .difficulty-btn.selected{
+    background: var(--fg);
+    color: var(--bg);
+  }
+  .timer-input-group{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .timer-input{
+    flex: 1;
+    padding: 10px;
+    border: 2px solid var(--fg);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 16px;
+    text-align: center;
+    font-weight: 700;
+  }
+  .timer-input:focus{
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+  }
+  @media (max-width:600px){
+    #wrap{ width:360px; height:600px; }
+  }
 </style>
 </head>
 <body>
   <div id="wrap">
     <div class="timerbar"><span id="timeFill"></span></div>
     <div class="hud">Time: <span id="timeText">--</span></div>
+    <div class="hint">R to restart</div>
     <div id="board" class="board"></div>
+  </div>
 
-    <!-- Menu -->
-    <div id="menu" class="menu">
-      <div class="menu-inner">
-        <div class="title">Memory Flip – Emoji Arcade</div>
-        <div>Select difficulty:</div>
-        <div class="buttons">
-          <button class="btn" data-mode="easy">Easy • 4×4 • 60s</button>
-          <button class="btn" data-mode="medium">Medium • 5×4 • 90s</button>
-          <button class="btn" data-mode="hard">Hard • 6×6 • 120s</button>
+  <!-- Menu Overlay -->
+  <div id="menu" class="overlay show">
+    <div class="overlay-inner">
+      <div class="title">Memory Flip</div>
+      <div class="subtitle">Select difficulty:</div>
+      <div class="buttons">
+        <button class="btn" data-mode="easy">Easy • 4×4 • 60s</button>
+        <button class="btn" data-mode="medium">Medium • 5×4 • 90s</button>
+        <button class="btn" data-mode="hard">Hard • 6×6 • 120s</button>
+      </div>
+      <div class="custom-timer">
+        <label>Custom Game:</label>
+        <div class="difficulty-select">
+          <button class="difficulty-btn selected" data-custom-diff="easy">4×4</button>
+          <button class="difficulty-btn" data-custom-diff="medium">5×4</button>
+          <button class="difficulty-btn" data-custom-diff="hard">6×6</button>
         </div>
-        <div class="subtitle">Flip cards to match all pairs before time runs out.</div>
+        <label>Timer (seconds):</label>
+        <div class="timer-input-group">
+          <input type="number" id="customTime" class="timer-input" min="10" max="999" value="60" placeholder="60">
+          <button class="btn" id="customBtn" style="padding:10px 16px; flex-shrink:0;">Start</button>
+        </div>
       </div>
+      <div class="subtitle" style="opacity:0.6; font-size:12px">Match all pairs before time runs out</div>
     </div>
+  </div>
 
-    <!-- Overlays -->
-    <div id="win" class="overlay backdrop" style="display:none">
-      <div class="panel">
-        <div class="title">YOU WIN 🎉</div>
-        <div class="subtitle">Press <b>R</b> to return to menu</div>
-      </div>
+  <!-- Win Overlay -->
+  <div id="win" class="overlay">
+    <div class="overlay-inner">
+      <div class="title">YOU WIN!</div>
+      <div class="subtitle">Press R to return to menu</div>
     </div>
+  </div>
 
-    <div id="lose" class="overlay red" style="display:none">
-      <div class="panel" style="background:transparent; border-color:#000;">
-        <div class="title">GAME OVER</div>
-        <div class="subtitle">Press <b>R</b> to restart</div>
-      </div>
+  <!-- Lose Overlay -->
+  <div id="lose" class="overlay red">
+    <div class="overlay-inner" style="background:transparent; border-color:#000; color:#000;">
+      <div class="title">GAME OVER</div>
+      <div class="subtitle">Press R to restart</div>
     </div>
-
-    <div class="hint">Press <b>R</b> to restart</div>
   </div>
 
 <script>
-// ====== Audio (WebAudio minimal beeps) ======
-let actx=null;
-function ensureAudio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
-function beep(freq=440, dur=0.1, type="sine", gain=0.06){
-  if(!actx) return;
-  const o = actx.createOscillator();
-  const g = actx.createGain();
-  o.type = type; o.frequency.value=freq;
-  g.gain.value = gain;
-  o.connect(g).connect(actx.destination);
-  o.start(); o.stop(actx.currentTime+dur);
-}
-const sfx = {
-  flip(){ beep(500, .07, "square", .06); },
-  match(){
-    beep(660, .07, "triangle", .07);
-    setTimeout(()=>beep(880,.1,"triangle",.07), 70);
+// ====== Enhanced Audio System ======
+const ac = new (window.AudioContext||window.webkitAudioContext)();
+
+const sounds = {
+  flip() {
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, ac.currentTime + 0.08);
+    
+    gain.gain.setValueAtTime(0.1, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.1);
+    
+    osc.connect(gain).connect(ac.destination);
+    osc.start();
+    osc.stop(ac.currentTime + 0.12);
   },
-  wrong(){
-    beep(180,.12,"sawtooth",.06);
+  
+  match() {
+    // Bright, cheerful chord
+    const freqs = [800, 1000, 1200];
+    freqs.forEach((freq, i) => {
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      
+      gain.gain.setValueAtTime(0.08, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.3);
+      
+      osc.connect(gain).connect(ac.destination);
+      osc.start();
+      osc.stop(ac.currentTime + 0.35);
+    });
+    
+    // Add a little sparkle on top
+    setTimeout(() => {
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.value = 1600;
+      
+      gain.gain.setValueAtTime(0.06, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.15);
+      
+      osc.connect(gain).connect(ac.destination);
+      osc.start();
+      osc.stop(ac.currentTime + 0.18);
+    }, 80);
   },
-  tickLow(){ beep(440,.04,"square",.045); },
-  tickHigh(){ beep(880,.04,"square",.045); },
+  
+  wrong() {
+    // Descending tone with slight vibrato
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    const vibrato = ac.createOscillator();
+    const vibratoGain = ac.createGain();
+    
+    vibrato.frequency.value = 6;
+    vibratoGain.gain.value = 10;
+    
+    vibrato.connect(vibratoGain).connect(osc.frequency);
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(400, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(200, ac.currentTime + 0.2);
+    
+    gain.gain.setValueAtTime(0.12, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.25);
+    
+    osc.connect(gain).connect(ac.destination);
+    osc.start();
+    vibrato.start();
+    osc.stop(ac.currentTime + 0.3);
+    vibrato.stop(ac.currentTime + 0.3);
+  },
+  
+  tick() {
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.value = 600;
+    
+    gain.gain.setValueAtTime(0.04, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.05);
+    
+    osc.connect(gain).connect(ac.destination);
+    osc.start();
+    osc.stop(ac.currentTime + 0.06);
+  },
+  
+  tickUrgent() {
+    // Double beep for urgency
+    const osc1 = ac.createOscillator();
+    const gain1 = ac.createGain();
+    
+    osc1.type = 'sine';
+    osc1.frequency.value = 1000;
+    
+    gain1.gain.setValueAtTime(0.08, ac.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.06);
+    
+    osc1.connect(gain1).connect(ac.destination);
+    osc1.start();
+    osc1.stop(ac.currentTime + 0.08);
+    
+    setTimeout(() => {
+      const osc2 = ac.createOscillator();
+      const gain2 = ac.createGain();
+      
+      osc2.type = 'sine';
+      osc2.frequency.value = 1200;
+      
+      gain2.gain.setValueAtTime(0.08, ac.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.06);
+      
+      osc2.connect(gain2).connect(ac.destination);
+      osc2.start();
+      osc2.stop(ac.currentTime + 0.08);
+    }, 100);
+  },
+  
+  win() {
+    // Triumphant ascending arpeggio
+    const notes = [
+      {freq: 523, time: 0},      // C
+      {freq: 659, time: 0.12},   // E
+      {freq: 784, time: 0.24},   // G
+      {freq: 1047, time: 0.36}   // C (octave)
+    ];
+    
+    notes.forEach(note => {
+      setTimeout(() => {
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.value = note.freq;
+        
+        gain.gain.setValueAtTime(0.15, ac.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.3);
+        
+        osc.connect(gain).connect(ac.destination);
+        osc.start();
+        osc.stop(ac.currentTime + 0.35);
+      }, note.time * 1000);
+    });
+  },
+  
+  lose() {
+    // Dramatic descending sequence
+    const osc1 = ac.createOscillator();
+    const gain1 = ac.createGain();
+    
+    osc1.type = 'triangle';
+    osc1.frequency.setValueAtTime(400, ac.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(100, ac.currentTime + 0.5);
+    
+    gain1.gain.setValueAtTime(0.18, ac.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.55);
+    
+    osc1.connect(gain1).connect(ac.destination);
+    osc1.start();
+    osc1.stop(ac.currentTime + 0.6);
+    
+    // Low rumble
+    const osc2 = ac.createOscillator();
+    const gain2 = ac.createGain();
+    
+    osc2.type = 'sawtooth';
+    osc2.frequency.value = 80;
+    
+    gain2.gain.setValueAtTime(0.15, ac.currentTime);
+    gain2.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.4);
+    
+    osc2.connect(gain2).connect(ac.destination);
+    osc2.start();
+    osc2.stop(ac.currentTime + 0.45);
+  }
 };
 
 // ====== Game State ======
 const boardEl = document.getElementById('board');
-const menuEl  = document.getElementById('menu');
-const winEl   = document.getElementById('win');
-const loseEl  = document.getElementById('lose');
+const menuEl = document.getElementById('menu');
+const winEl = document.getElementById('win');
+const loseEl = document.getElementById('lose');
 const timeText = document.getElementById('timeText');
 const timeFill = document.getElementById('timeFill');
+const customTimeInput = document.getElementById('customTime');
+const customBtn = document.getElementById('customBtn');
 
-const EMOJIS = ["🍎","⭐","🎵","⚽","🎲","🚀","🐍","❤️","🍩","🔥","🌙","🎧","🐟","🌵","❄️","🎁","🧩","🍌","🍒","🧠","👾","🦴","🪐","💎","🐱","🐶","🦊","🦖","🍇","🥕","☕","📀","✏️","🧱","🧿","🔔","🔑"];
+const EMOJIS = ["🎯","⭐","🎵","⚽","🎲","🚀","🍕","❤️","🍩","🔥","🌙","🎧","🍟","🌵","❄️","🎨","🧩","🌈","💎","🧠","👾","🦴","🪐","💠","🐱","🐶","🦊","🦖","🐇","🥕","☕","🎮","✏️","🧱","🧿","🔔","🔑"];
 
 let cols=4, rows=4, totalPairs=8;
 let timeTotal=60, timeLeft=60, timerId=null, running=false;
 let first=null, lock=false, matchedCount=0;
+let selectedCustomDifficulty = 'easy'; // Track selected custom difficulty
 
 // ====== Helpers ======
 function shuffle(a){
@@ -163,10 +428,18 @@ function pickEmojis(nPairs){
   return shuffle([...pool, ...pool]);
 }
 
-function buildBoard(mode){
+function buildBoard(mode, customTime = null){
   if(mode==="easy"){ cols=4; rows=4; timeTotal=60; }
   else if(mode==="medium"){ cols=5; rows=4; timeTotal=90; }
-  else { cols=6; rows=6; timeTotal=120; }
+  else if(mode==="hard"){ cols=6; rows=6; timeTotal=120; }
+  else if(mode==="custom"){ 
+    // Use selected custom difficulty
+    if(selectedCustomDifficulty === 'easy'){ cols=4; rows=4; }
+    else if(selectedCustomDifficulty === 'medium'){ cols=5; rows=4; }
+    else if(selectedCustomDifficulty === 'hard'){ cols=6; rows=6; }
+    timeTotal = customTime || 60;
+  }
+  
   totalPairs = Math.floor((cols*rows)/2);
 
   boardEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
@@ -194,7 +467,8 @@ function buildBoard(mode){
     back.className = "card-face back";
     back.textContent = sym;
 
-    inner.appendChild(front); inner.appendChild(back);
+    inner.appendChild(front); 
+    inner.appendChild(back);
     card.appendChild(inner);
     card.addEventListener('click', onFlip);
     frag.appendChild(card);
@@ -211,13 +485,12 @@ function buildBoard(mode){
 
 function onFlip(e){
   if(!running) return;
-  ensureAudio();
   const card = e.currentTarget;
   if(lock) return;
   if(card.classList.contains('flipped')) return;
 
   card.classList.add('flipped');
-  sfx.flip();
+  sounds.flip();
 
   if(!first){
     first = card;
@@ -226,7 +499,7 @@ function onFlip(e){
     if(a.dataset.symbol === b.dataset.symbol){
       a.classList.add('matched');
       b.classList.add('matched');
-      sfx.match();
+      sounds.match();
       matchedCount++;
       first = null;
       if(matchedCount >= totalPairs){
@@ -236,13 +509,13 @@ function onFlip(e){
       lock = true;
       a.classList.add('shake');
       b.classList.add('shake');
-      sfx.wrong();
+      sounds.wrong();
       setTimeout(()=>{
         a.classList.remove('shake','flipped');
         b.classList.remove('shake','flipped');
         lock = false;
         first = null;
-      }, 550);
+      }, 500);
     }
   }
 }
@@ -257,7 +530,8 @@ function updateTimer(initial=false){
     timeFill.style.background = 'var(--fg)';
   }
   if(!initial){
-    if(timeLeft <= 10) sfx.tickHigh(); else sfx.tickLow();
+    if(timeLeft <= 10) sounds.tickUrgent(); 
+    else sounds.tick();
   }
 }
 
@@ -273,21 +547,23 @@ function tick(){
 function win(){
   running=false;
   clearInterval(timerId);
-  winEl.style.display = "grid";
+  sounds.win();
+  winEl.classList.add('show');
 }
 
 function lose(){
   running=false;
   clearInterval(timerId);
-  loseEl.style.display = "grid";
+  sounds.lose();
+  loseEl.classList.add('show');
 }
 
 function backToMenu(){
   running=false;
   clearInterval(timerId);
-  winEl.style.display="none";
-  loseEl.style.display="none";
-  menuEl.style.display="grid";
+  winEl.classList.remove('show');
+  loseEl.classList.remove('show');
+  menuEl.classList.add('show');
   boardEl.innerHTML="";
   timeText.textContent="--";
   timeFill.style.transform="scaleX(1)";
@@ -303,12 +579,42 @@ document.addEventListener('keydown', (e)=>{
 menuEl.addEventListener('click', (e)=>{
   const btn = e.target.closest('[data-mode]');
   if(!btn) return;
-  menuEl.style.display="none";
+  menuEl.classList.remove('show');
   const mode = btn.dataset.mode;
   buildBoard(mode);
 });
 
-menuEl.style.display="grid";
+customBtn.addEventListener('click', ()=>{
+  const customTime = parseInt(customTimeInput.value) || 60;
+  if(customTime < 10) {
+    customTimeInput.value = 10;
+    return;
+  }
+  if(customTime > 999) {
+    customTimeInput.value = 999;
+    return;
+  }
+  menuEl.classList.remove('show');
+  buildBoard('custom', customTime);
+});
+
+// Handle custom difficulty selection
+const difficultyBtns = document.querySelectorAll('.difficulty-btn');
+difficultyBtns.forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    difficultyBtns.forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedCustomDifficulty = btn.dataset.customDiff;
+  });
+});
+
+// Allow Enter key in custom time input
+customTimeInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){
+    customBtn.click();
+  }
+});
 </script>
 </body>
 </html>
