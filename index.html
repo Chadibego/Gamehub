@@ -5,83 +5,212 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gamehub</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 10C32 10 17 25 17 43c0 18 15 33 33 33 8 0 16-3 22-8 2-2 2-5 0-7-2-2-5-2-7 0-4 3-9 5-15 5-12 0-23-9-23-23 0-12 11-23 23-23 6 0 11 2 15 5 2 2 5 2 7 0 2-2 2-5 0-7-6-5-14-8-22-8z' fill='%23000'/%3E%3Cpath d='M65 55c-8 0-15 7-15 15s7 15 15 15c4 0 7-1 10-3 2-1 3-4 1-6-1-2-4-3-6-1-1 1-3 2-5 2-4 0-7-3-7-7s3-7 7-7c2 0 4 1 5 2 2 1 5 0 6-2 2-2 1-5-1-6-3-2-6-3-10-3z' fill='%23000'/%3E%3C/svg%3E">
-  <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAABMLAAATCwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////Df///yj///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////KP///w3//////////w////8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p//////////8AAAAA////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////KQAAAAD//////////wAAAAD///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8pAAAAAP//////////AAAAAP///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///ykAAAAA//////////8AAAAA////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////KQAAAAD//////////wAAAAD///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8pAAAAAP//////////AAAAAP///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///ykAAAAA//////////8AAAAA////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////KQAAAAD//////////wAAAAD///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8pAAAAAP//////////AAAAAP///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///ykAAAAA//////////8AAAAA////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////KQAAAAD//////////wAAAAD///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8pAAAAAP//////////AAAAAP///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///ykAAAAA//////////8AAAAA////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////KQAAAAD//////////wAAAAD///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8pAAAAAP//////////AAAAAP///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///ykAAAAA////Df///yj///8p////Kf///yn///8p////Kf///yn///8p////Kf///yn///8p////Kf///yj///8NAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA">
   <link href="https://fonts.googleapis.com/css2?family=Gloria+Hallelujah&family=Patrick+Hand&display=swap" rel="stylesheet">
   <style>
     :root {
+      /* Default Theme */
       --bg: #fff;
       --text: #111;
       --banner1: #f8f8f8;
       --banner2: #f2f2f2;
       --banner3: #eee;
-      --cursor-border: #111;
+      --accent: #111;
     }
+
+    /* Dark Theme */
     body.dark {
       --bg: #121212;
       --text: #f5f5f5;
       --banner1: #1e1e1e;
-      --banner2: #222;
+      --banner2: #252525;
       --banner3: #2a2a2a;
-      --cursor-border: #f5f5f5;
+      --accent: #f5f5f5;
     }
+
+    /* Desert Theme */
+    body.desert {
+      --bg: #f4e4c1;
+      --text: #5c4a2f;
+      --banner1: #e8d4a8;
+      --banner2: #dcc494;
+      --banner3: #d0b480;
+      --accent: #8b6f47;
+    }
+
+    /* Space Theme */
+    body.space {
+      --bg: #0a0e27;
+      --text: #e0e6ff;
+      --banner1: #1a1f3a;
+      --banner2: #252d4d;
+      --banner3: #303b60;
+      --accent: #00d4ff;
+    }
+
+    /* Flower Theme */
+    body.flower {
+      --bg: #fff5f8;
+      --text: #4a2c3e;
+      --banner1: #ffd6e8;
+      --banner2: #ffb8d9;
+      --banner3: #ff9acc;
+      --accent: #d946a6;
+    }
+
+    /* Neon Theme */
+    body.neon {
+      --bg: #000;
+      --text: #00ff88;
+      --banner1: #1a0033;
+      --banner2: #2d0055;
+      --banner3: #400077;
+      --accent: #ff00ff;
+    }
+
+    /* Retro Theme */
+    body.retro {
+      --bg: #fef6e4;
+      --text: #001858;
+      --banner1: #f582ae;
+      --banner2: #8bd3dd;
+      --banner3: #f3d2c1;
+      --accent: #f582ae;
+    }
+
+    /* Pastel Theme */
+    body.pastel {
+      --bg: #f0f4f8;
+      --text: #334155;
+      --banner1: #dfe7fd;
+      --banner2: #fde7f0;
+      --banner3: #e7fded;
+      --accent: #7c3aed;
+    }
+
     body {
       margin: 0;
       font-family: 'Patrick Hand', cursive;
       background: var(--bg);
       color: var(--text);
-      transition: background 0.3s ease, color 0.3s ease;
+      transition: background 0.5s ease, color 0.5s ease;
     }
+
     header {
       text-align: center;
       padding: 40px 20px 20px;
       position: relative;
     }
+
     .logo-text {
       font-family: 'Gloria Hallelujah', cursive;
       font-size: 3rem;
       font-weight: normal;
       letter-spacing: 2px;
       margin-bottom: 10px;
+      transition: color 0.5s ease;
     }
+
     .made-by-header {
       font-family: 'Gloria Hallelujah', cursive;
       font-size: 1.1rem;
       margin: 0;
       animation: wiggle 3s infinite ease-in-out;
     }
-    .dark-toggle {
-      position: absolute;
+
+    /* Theme Menu */
+    .theme-menu {
+      position: fixed;
       top: 20px;
-      right: 20px;
-      width: 44px;
-      height: 44px;
-      border: 2px solid var(--text);
-      border-radius: 50%;
-      background: none;
+      left: 20px;
+      z-index: 1000;
+    }
+
+    .theme-button {
+      width: 50px;
+      height: 50px;
+      border: 3px solid var(--text);
+      border-radius: 12px;
+      background: var(--bg);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: 24px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-    .dark-toggle svg {
-      width: 24px;
-      height: 24px;
-      fill: var(--text);
+
+    .theme-button:hover {
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.15);
     }
+
+    .theme-dropdown {
+      position: absolute;
+      top: 60px;
+      left: 0;
+      background: var(--bg);
+      border: 3px solid var(--text);
+      border-radius: 12px;
+      padding: 10px;
+      min-width: 180px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: all 0.3s ease;
+    }
+
+    .theme-dropdown.show {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .theme-option {
+      padding: 12px 16px;
+      margin: 4px 0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Gloria Hallelujah', cursive;
+      font-size: 1rem;
+    }
+
+    .theme-option:hover {
+      background: var(--banner1);
+      transform: translateX(4px);
+    }
+
+    .theme-option.active {
+      background: var(--banner2);
+      font-weight: bold;
+    }
+
+    .theme-icon {
+      font-size: 1.2rem;
+    }
+
     .games-container {
       max-width: 800px;
       margin: 40px auto;
       padding: 0 20px;
       position: relative;
     }
+
     .games {
       display: flex;
       flex-direction: column;
       gap: 20px;
     }
+
     .games.hidden {
       display: none;
     }
+
     .banner {
       display: block;
       padding: 50px 20px;
@@ -91,17 +220,30 @@
       text-decoration: none;
       color: var(--text);
       background: var(--banner1);
-      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.5s ease;
+      border: 2px solid transparent;
     }
+
     .banner:nth-child(2) { background: var(--banner2); }
     .banner:nth-child(3) { background: var(--banner3); }
     .banner:nth-child(4) { background: var(--banner1); }
     .banner:nth-child(5) { background: var(--banner2); }
     .banner:nth-child(6) { background: var(--banner3); }
     .banner:nth-child(7) { background: var(--banner1); }
+
     .banner:hover {
       transform: translateY(-6px);
       box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      border-color: var(--accent);
+    }
+
+    /* Special hover effects for themed modes */
+    body.neon .banner:hover {
+      box-shadow: 0 8px 20px var(--accent), 0 0 30px var(--accent);
+    }
+
+    body.space .banner:hover {
+      box-shadow: 0 8px 20px var(--accent), 0 0 40px rgba(0, 212, 255, 0.3);
     }
 
     .pagination {
@@ -152,6 +294,7 @@
       stroke-linecap: round;
       stroke-linejoin: round;
       fill: none;
+      transition: stroke 0.5s ease;
     }
     
     .page-info {
@@ -163,19 +306,23 @@
 
     #gameView {
       position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       background: var(--bg);
       display: none;
       flex-direction: column;
       z-index: 1000;
       animation: fadeIn 0.3s ease;
     }
+
     #gameFrame {
       flex: 1;
       width: 100%;
       border: none;
     }
+
     #backBtn {
       position: absolute;
       top: 50%;
@@ -191,16 +338,20 @@
       align-items: center;
       justify-content: center;
       z-index: 1100;
-      transition: background 0.3s ease, border 0.3s ease;
+      transition: all 0.3s ease;
     }
+
     #backBtn svg {
       width: 24px;
       height: 24px;
       fill: var(--text);
+      transition: fill 0.5s ease;
     }
+
     #backBtn:hover {
       background: var(--banner2);
     }
+
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -279,20 +430,22 @@
       fill: #fff;
     }
     
-    .social-link.discord:hover {
-      border-color: #7289da;
-      background: #7289da;
-    }
-    .social-link.discord:hover svg {
-      fill: #fff;
-    }
-    
     @keyframes wiggle {
       0%, 100% { transform: rotate(-2deg); }
       50% { transform: rotate(2deg); }
     }
     
     @media (max-width: 480px) {
+      .theme-menu {
+        top: 10px;
+        left: 10px;
+      }
+      
+      .theme-button {
+        width: 44px;
+        height: 44px;
+      }
+      
       .social-links {
         gap: 12px;
       }
@@ -315,38 +468,76 @@
   </style>
 </head>
 <body>
+  <!-- Theme Menu -->
+  <div class="theme-menu">
+    <button class="theme-button" id="themeBtn" title="Change Theme">
+      🎨
+    </button>
+    <div class="theme-dropdown" id="themeDropdown">
+      <div class="theme-option active" data-theme="default">
+        <span class="theme-icon">⚪</span>
+        <span>Default</span>
+      </div>
+      <div class="theme-option" data-theme="dark">
+        <span class="theme-icon">🌙</span>
+        <span>Dark</span>
+      </div>
+      <div class="theme-option" data-theme="desert">
+        <span class="theme-icon">🏜️</span>
+        <span>Desert</span>
+      </div>
+      <div class="theme-option" data-theme="space">
+        <span class="theme-icon">🚀</span>
+        <span>Space</span>
+      </div>
+      <div class="theme-option" data-theme="flower">
+        <span class="theme-icon">🌸</span>
+        <span>Flower</span>
+      </div>
+      <div class="theme-option" data-theme="neon">
+        <span class="theme-icon">⚡</span>
+        <span>Neon</span>
+      </div>
+      <div class="theme-option" data-theme="retro">
+        <span class="theme-icon">🕹️</span>
+        <span>Retro</span>
+      </div>
+      <div class="theme-option" data-theme="pastel">
+        <span class="theme-icon">🎀</span>
+        <span>Pastel</span>
+      </div>
+    </div>
+  </div>
+
   <header>
     <h1 class="logo-text">Gamehub</h1>
     <p class="made-by-header">✨ Made by Chadibego ✨</p>
-    <button class="dark-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">
-      <svg id="darkIcon" viewBox="0 0 24 24"><path d="M12 2a9.93 9.93 0 00-7.07 2.93C2.93 6.93 2 9.39 2 12s.93 5.07 2.93 7.07A9.93 9.93 0 0012 22c.34 0 .67-.02 1-.07a9 9 0 010-17.86A9.93 9.93 0 0012 2z"/></svg>
-    </button>
   </header>
 
   <main class="games-container">
     <!-- Page 1 -->
     <div class="games" id="page1">
-      <a href="#" class="banner" onclick="openGame('Dodger.html')">Dodge the Blocks</a>
-      <a href="#" class="banner" onclick="openGame('Snake Lite.html')">Snake Lite</a>
-      <a href="#" class="banner" onclick="openGame('Falling Walls.html')">Falling Walls</a>
-      <a href="#" class="banner" onclick="openGame('memory_flip_emoji_arcade_v1.html')">Memory Flip</a>
-      <a href="#" class="banner" onclick="openGame('stack_builder_ultra_slow_animated_instant_restart_hintfix.html')">Stack Builder</a>
-      <a href="#" class="banner" onclick="openGame('Paddel Smashers.html')">Paddle Smash</a>
+      <a href="#" class="banner" data-game="Dodger.html">Dodge the Blocks</a>
+      <a href="#" class="banner" data-game="Snake Lite.html">Snake Lite</a>
+      <a href="#" class="banner" data-game="Falling Walls.html">Falling Walls</a>
+      <a href="#" class="banner" data-game="memory_flip_emoji_arcade_v1.html">Memory Flip</a>
+      <a href="#" class="banner" data-game="stack_builder_ultra_slow_animated_instant_restart_hintfix.html">Stack Builder</a>
+      <a href="#" class="banner" data-game="Paddel Smashers.html">Paddle Smash</a>
     </div>
 
     <!-- Page 2 -->
     <div class="games hidden" id="page2">
-      <a href="#" class="banner" onclick="openGame('Color Catch.html')">Color Catch</a>
-      <a href="#" class="banner" onclick="openGame('Bubble_Pop.html')">Bubble Pop</a>
-      <a href="#" class="banner" onclick="openGame('Pixel Runner.html')">Pixel Runner</a>
-      <a href="#" class="banner" onclick="openGame('Tetris.html')">Tetris</a>
-      <a href="#" class="banner" onclick="openGame('Cube Jump.html')">Cube Jump</a>
-      <a href="#" class="banner" onclick="openGame('Tic Tac Toe.html')">Tic Tac Toe</a>
+      <a href="#" class="banner" data-game="Color Catch.html">Color Catch</a>
+      <a href="#" class="banner" data-game="Bubble_Pop.html">Bubble Pop</a>
+      <a href="#" class="banner" data-game="Pixel Runner.html">Pixel Runner</a>
+      <a href="#" class="banner" data-game="Tetris.html">Tetris</a>
+      <a href="#" class="banner" data-game="Cube Jump.html">Cube Jump</a>
+      <a href="#" class="banner" data-game="Tic Tac Toe.html">Tic Tac Toe</a>
     </div>
 
     <!-- Pagination -->
     <div class="pagination">
-      <button class="page-nav" id="prevBtn" onclick="previousPage()">
+      <button class="page-nav" id="prevBtn">
         <svg class="arrow" viewBox="0 0 24 24">
           <path d="M15.5 18.2c0.1 0.1 0.1 0.2 0 0.3l-0.3 0.3c-0.1 0.1-0.2 0.1-0.3 0L8.8 12.4c-0.1-0.1-0.1-0.2 0-0.3l6.1-6.4c0.1-0.1 0.2-0.1 0.3 0l0.3 0.3c0.1 0.1 0.1 0.2 0 0.3L9.8 12L15.5 18.2z" stroke-dasharray="2,1"/>
         </svg>
@@ -356,7 +547,7 @@
         <span id="currentPage">1</span> / <span id="totalPages">2</span>
       </div>
       
-      <button class="page-nav" id="nextBtn" onclick="nextPage()">
+      <button class="page-nav" id="nextBtn">
         <svg class="arrow" viewBox="0 0 24 24">
           <path d="M8.5 5.8c-0.1-0.1-0.1-0.2 0-0.3l0.3-0.3c0.1-0.1 0.2-0.1 0.3 0l6.1 6.4c0.1 0.1 0.1 0.2 0 0.3l-6.1 6.4c-0.1 0.1-0.2 0.1-0.3 0l-0.3-0.3c-0.1-0.1-0.1-0.2 0-0.3L14.2 12L8.5 5.8z" stroke-dasharray="2,1"/>
         </svg>
@@ -387,25 +578,104 @@
   </footer>
 
   <div id="gameView">
-    <button id="backBtn" onclick="closeGame()">
+    <button id="backBtn">
       <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
     <iframe id="gameFrame"></iframe>
   </div>
 
   <script>
-    const darkIcon = document.getElementById("darkIcon");
     const gameView = document.getElementById("gameView");
     const gameFrame = document.getElementById("gameFrame");
     const footer = document.querySelector("footer");
+    const themeBtn = document.getElementById("themeBtn");
+    const themeDropdown = document.getElementById("themeDropdown");
+    const themeOptions = document.querySelectorAll(".theme-option");
+    const banners = document.querySelectorAll(".banner");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const backBtn = document.getElementById("backBtn");
     
     let currentPageNum = 1;
     const totalPagesNum = 2;
+    let currentTheme = localStorage.getItem('gamehub-theme') || 'default';
+
+    // Apply saved theme on load
+    if (currentTheme !== 'default') {
+      document.body.className = currentTheme;
+      updateActiveTheme(currentTheme);
+    }
+
+    // Theme menu toggle
+    themeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      themeDropdown.classList.toggle('show');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!themeDropdown.contains(e.target) && e.target !== themeBtn) {
+        themeDropdown.classList.remove('show');
+      }
+    });
+
+    // Theme selection
+    themeOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        const theme = option.dataset.theme;
+        applyTheme(theme);
+        themeDropdown.classList.remove('show');
+      });
+    });
+
+    function applyTheme(theme) {
+      currentTheme = theme;
+      
+      // Remove all theme classes
+      document.body.className = '';
+      
+      // Apply new theme (except default)
+      if (theme !== 'default') {
+        document.body.classList.add(theme);
+      }
+      
+      // Save to localStorage
+      localStorage.setItem('gamehub-theme', theme);
+      
+      // Update active state
+      updateActiveTheme(theme);
+    }
+
+    function updateActiveTheme(theme) {
+      themeOptions.forEach(opt => {
+        if (opt.dataset.theme === theme) {
+          opt.classList.add('active');
+        } else {
+          opt.classList.remove('active');
+        }
+      });
+    }
+
+    // Game banners click handler
+    banners.forEach(banner => {
+      banner.addEventListener('click', (e) => {
+        e.preventDefault();
+        const game = banner.dataset.game;
+        if (game) openGame(game);
+      });
+    });
+
+    // Pagination handlers
+    prevBtn.addEventListener('click', previousPage);
+    nextBtn.addEventListener('click', nextPage);
+
+    // Back button handler
+    backBtn.addEventListener('click', closeGame);
 
     function updatePagination() {
       document.getElementById('currentPage').textContent = currentPageNum;
-      document.getElementById('prevBtn').disabled = currentPageNum === 1;
-      document.getElementById('nextBtn').disabled = currentPageNum === totalPagesNum;
+      prevBtn.disabled = currentPageNum === 1;
+      nextBtn.disabled = currentPageNum === totalPagesNum;
       
       for (let i = 1; i <= totalPagesNum; i++) {
         const page = document.getElementById(`page${i}`);
@@ -431,17 +701,10 @@
       }
     }
 
-    function toggleDarkMode() {
-      document.body.classList.toggle("dark");
-      if (document.body.classList.contains("dark")) {
-        darkIcon.innerHTML = '<path d="M6.76 4.84l-1.8-1.79L4.22 4.8 6 6.59l.76-1.75zm10.48 0l.76 1.75L20 6.59l-1.76-1.79-1.8 1.79zM12 4a1 1 0 110-2 1 1 0 010 2zm8 8a1 1 0 110-2 1 1 0 010 2zm-8 10a1 1 0 110-2 1 1 0 010 2zm-6.24-2.84L4 17.41l1.76-1.79 1.8 1.79-1.8 1.75zM18 17.41l1.76 1.75-1.8 1.79-1.76-1.75 1.8-1.79zM12 18a6 6 0 100-12 6 6 0 000 12z"/>';
-      } else {
-        darkIcon.innerHTML = '<path d="M12 2a9.93 9.93 0 00-7.07 2.93C2.93 6.93 2 9.39 2 12s.93 5.07 2.93 7.07A9.93 9.93 0 0012 22c.34 0 .67-.02 1-.07a9 9 0 010-17.86A9.93 9.93 0 0012 2z"/>';
-      }
-    }
-
     function openGame(file) {
-      gameFrame.src = file;
+      // Pass theme to game via URL parameter
+      const themeParam = currentTheme !== 'default' ? `?theme=${currentTheme}` : '';
+      gameFrame.src = file + themeParam;
       gameView.style.display = "flex";
       document.querySelector(".games-container").style.display = "none";
       footer.style.display = "none";
@@ -458,6 +721,7 @@
       footer.style.display = "block";
     }
 
+    // Initialize
     updatePagination();
   </script>
 </body>
